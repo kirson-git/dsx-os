@@ -25,13 +25,13 @@ spec:
       prune: false
       selfHeal: false
   sources:
-  - repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+  - repoURL: https://github.com/kirson-git/dsx-os.git
     targetRevision: main
     path: DPF/generated/platform
     directory:
       recurse: false
       include: '*.yaml'
-  - repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+  - repoURL: https://github.com/kirson-git/dsx-os.git
     targetRevision: main
     path: DPF/profiles/two-tenant-hbn/desired
     directory:

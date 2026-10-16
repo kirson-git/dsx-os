@@ -54,8 +54,9 @@ kubectl get pods -n argocd
 
 Follow the [DPF guide](DPF/README.md#2-set-the-dpu-bmc-ip-and-create-the-password-secret)
 to configure your site and create the private BMC password Secret with
-`bash DPF/credentials.sh`. Configure [private Git access](DPF/CREDENTIALS.md)
-so Argo can read this repository.
+`bash DPF/credentials.sh`. This public repository uses HTTPS, so Argo needs no
+Git credentials. For a private fork, configure
+[private Git access](DPF/CREDENTIALS.md).
 
 | Option | Files | Behavior |
 | --- | --- | --- |

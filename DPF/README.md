@@ -39,13 +39,14 @@ a tainted control-plane-only cluster needs reviewed workload/init-hook toleratio
 The default configuration installs external Argo in `argocd` on the same
 management cluster as DPF. Its destination is `in-cluster`; cluster registration
 is not required. Configure Argo access, authenticate your CLI or use its UI, and
-supply private Git access as described in [credentials](CREDENTIALS.md).
+use the public HTTPS repository without Git credentials. Private forks need
+[Git credentials](CREDENTIALS.md).
 Do not expand external Argo's Application watch scope to `dpf-operator-system`.
 
 ## 2. Set the DPU BMC IP and create the password Secret
 
 ```bash
-git clone git@github.com:kirson-git/dsx-os.git
+git clone https://github.com/kirson-git/dsx-os.git
 cd dsx-os
 ```
 

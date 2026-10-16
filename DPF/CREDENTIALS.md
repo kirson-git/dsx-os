@@ -46,7 +46,12 @@ kubectl get secret bmc-shared-password -n dpf-operator-system
 
 ## Git access for external Argo
 
-Use a read-only repository deploy key stored outside the checkout. Configure
+The supplied Applications use the public repository
+`https://github.com/kirson-git/dsx-os.git`; no Git credentials are required.
+GitHub SSH URLs require authentication even for public repositories.
+
+For a private fork using SSH, use a read-only repository deploy key stored
+outside the checkout. Configure
 trusted Git host keys in Argo through your administrator's process, then register
 the repository with the external Argo CLI session:
 

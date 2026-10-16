@@ -1,6 +1,6 @@
 # Default: external Argo in a separate namespace on the DPF management cluster.
 git:
-  repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+  repoURL: https://github.com/kirson-git/dsx-os.git
   revision: main
   path: DPF/generated/platform
 argoNamespace: dpf-operator-system
