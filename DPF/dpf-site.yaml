@@ -1,16 +1,11 @@
-# CUSTOMER SETTINGS: download this file, edit every EDIT value, then apply it.
-# The addresses below are examples, not the NICo lab's live settings.
-# kubectl apply -f dpf-site.yaml
-# Requires the platform to be Synced/Healthy. Sync operator config, then tenants.
-# One file contains two Argo Applications; the base manifests are fetched from Git.
-# Do not put passwords here. DPU BMC IPs/HBN/provisioning are configured separately.
+# Edit values marked "please change here". Lab settings are prefilled; no passwords.
+# Platform first, then sync dpf-operator-config, then dpf-tenants (see README.md).
+# VIPs are manual, outside DHCP. DPU management/BMC addresses use external DHCP.
+# Lab DHCP: l-ae-1137d (192.168.0.1), /etc/nico-lab-dhcp.conf; not installed here.
+# This file configures operator/tenants only; HBN and hardware provisioning follow.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
-metadata:
-  name: dpf-operator-config
-  namespace: argocd
-  labels:
-    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+metadata: {name: dpf-operator-config, namespace: argocd, labels: {customer.dpf.nvidia.com/package: dpf-platform-v26.4.0}}
 spec:
   project: default
   source:
@@ -19,38 +14,25 @@ spec:
     path: DPF/profiles/two-tenant-hbn/desired/10-operator-config
     kustomize:
       patches:
-      - target:
-          kind: DPFOperatorConfig
-          name: dpfoperatorconfig
+      - target: {kind: DPFOperatorConfig, name: dpfoperatorconfig}
         patch: |
           - op: replace
             path: /spec/overrides/kubernetesAPIServerVIP
-            value: 198.51.100.20  # EDIT: your management Kubernetes API IP
+            value: 10.220.175.20  # please change here: management Kubernetes API IP
           - op: replace
             path: /spec/overrides/kubernetesAPIServerPort
-            value: 6443  # EDIT if your API uses another port
-  destination:
-    name: in-cluster
-    namespace: dpf-operator-system
+            value: 6443  # please change here: management Kubernetes API port
+  destination: {name: in-cluster, namespace: dpf-operator-system}
   syncPolicy:
     syncOptions:
     - ServerSideApply=true
     - ClientSideApplyMigration=false
     - FailOnSharedResource=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 10s
-        factor: 2
-        maxDuration: 3m
+    retry: {limit: 5, backoff: {duration: 10s, factor: 2, maxDuration: 3m}}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
-metadata:
-  name: dpf-tenants
-  namespace: argocd
-  labels:
-    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+metadata: {name: dpf-tenants, namespace: argocd, labels: {customer.dpf.nvidia.com/package: dpf-platform-v26.4.0}}
 spec:
   project: default
   source:
@@ -59,37 +41,26 @@ spec:
     path: DPF/profiles/two-tenant-hbn/desired/20-tenants
     kustomize:
       patches:
-      - target:
-          kind: DPUCluster
-          name: tenant-europe
+      - target: {kind: DPUCluster, name: tenant-europe}
         patch: |
           - op: replace
             path: /spec/clusterEndpoint/keepalived/vip
-            value: 192.0.2.200  # EDIT: reserved Europe tenant VIP
+            value: 192.168.0.200  # please change here: Europe VIP, manual, outside DHCP
           - op: replace
             path: /spec/clusterEndpoint/keepalived/interface
-            value: YOUR_INTERFACE  # EDIT: interface on the management nodes
-      - target:
-          kind: DPUCluster
-          name: tenant-asia
+            value: enp7s0  # please change here: management-node interface carrying the VIP
+      - target: {kind: DPUCluster, name: tenant-asia}
         patch: |
           - op: replace
             path: /spec/clusterEndpoint/keepalived/vip
-            value: 192.0.2.203  # EDIT: reserved Asia tenant VIP
+            value: 192.168.0.203  # please change here: Asia VIP, manual, outside DHCP
           - op: replace
             path: /spec/clusterEndpoint/keepalived/interface
-            value: YOUR_INTERFACE  # EDIT: interface on the management nodes
-  destination:
-    name: in-cluster
-    namespace: dpf-operator-system
+            value: enp7s0  # please change here: management-node interface carrying the VIP
+  destination: {name: in-cluster, namespace: dpf-operator-system}
   syncPolicy:
     syncOptions:
     - ServerSideApply=true
     - ClientSideApplyMigration=false
     - FailOnSharedResource=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 10s
-        factor: 2
-        maxDuration: 3m
+    retry: {limit: 5, backoff: {duration: 10s, factor: 2, maxDuration: 3m}}
