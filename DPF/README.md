@@ -55,6 +55,8 @@ kubectl -n argocd patch application dpf-platform --type merge \
 kubectl -n argocd get application dpf-platform -w
 ```
 
+The sync waits for cert-manager’s API readiness check before creating dependent
+certificates. Start sync once; do not launch another while it is `Running`.
 Wait for `Synced` / `Healthy`, then press Ctrl+C. Before continuing, verify that
 this command prints `Succeeded`:
 

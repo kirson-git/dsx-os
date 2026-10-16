@@ -119,6 +119,30 @@ class RenderedChartTests(unittest.TestCase):
         self.assertLess(wave('Deployment','dpf-operator-controller-manager'),wave('DPFOperatorConfig','dpfoperatorconfig'))
         maint=next(o for o in self.objects if o['kind']=='MaintenanceOperatorConfig')
         self.assertEqual(maint['metadata']['annotations']['argocd.argoproj.io/sync-wave'],'41')
+    def test_cert_manager_api_check_gates_dependent_certificates(self):
+        job=next((o for o in self.objects if o['kind']=='Job' and
+                  o['metadata']['name']=='cert-manager-startupapicheck'),None)
+        self.assertIsNotNone(job, 'Pod readiness alone does not prove webhook TLS is ready')
+        annotations=job['metadata']['annotations']
+        self.assertEqual(annotations['argocd.argoproj.io/hook'],'Sync')
+        self.assertEqual(annotations['argocd.argoproj.io/hook-delete-policy'],'BeforeHookCreation')
+        gate=int(annotations['argocd.argoproj.io/sync-wave'])
+        pod=job['spec']['template']['spec']
+        self.assertEqual(job['spec']['backoffLimit'],0)
+        self.assertEqual(pod['containers'][0]['args'][:3],['check','api','--wait=5m'])
+        for key in ['node-role.kubernetes.io/control-plane','node-role.kubernetes.io/master']:
+            self.assertTrue(any(t.get('key')==key and t.get('effect')=='NoSchedule'
+                                for t in pod['tolerations']))
+        for obj in self.objects:
+            name=obj['metadata']['name']; kind=obj['kind']
+            wave=int(obj['metadata']['annotations']['argocd.argoproj.io/sync-wave'])
+            if (kind=='Deployment' and name.startswith('cert-manager')) or (
+                kind in ('ServiceAccount','Role','RoleBinding') and name.startswith('cert-manager-startupapicheck')):
+                self.assertLess(wave,gate)
+                self.assertNotIn('argocd.argoproj.io/hook',obj['metadata']['annotations'])
+            if kind in ('Issuer','Certificate','ClusterIssuer'):
+                self.assertGreater(wave,gate)
+
     def test_no_secret_data_and_no_helm_hooks(self):
         for obj in self.objects:
             self.assertFalse(obj['kind']=='Secret' and (obj.get('data') or obj.get('stringData')))

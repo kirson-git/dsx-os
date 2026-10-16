@@ -44,7 +44,7 @@
       "serviceInstallationID": "dsx-dpf-services"
     }
   },
-  "resources": 197,
-  "platformSHA256": "cf28a9540b25c25ff5e640ae7dd9c3e5ab5b52e9e6a1134b421e4e065465e5eb",
+  "resources": 201,
+  "platformSHA256": "e3c3511e1bede392ac6f9c83c4475cbdaa422bcd5210458612bcb599fc5f6b9c",
   "validation": "Offline render only; no live install, migration, cleanup or DPU provisioning performed."
 }

@@ -126,15 +126,29 @@ def prepare_object(original,component,wave):
     if hook.startswith('test'):return None
     if hook in ('pre-delete','post-delete'):return None # Never automatically dismantle the etcd store.
     if hook:
-        if component!='kamaji':raise ValueError(f'Unreviewed Helm hook: {component}/{name}: {hook}')
-        if kind=='Job':
-            waves={'kamaji-etcd-setup-1':21,'kamaji-etcd-setup-2':31}
-            if name not in waves:raise ValueError(f'Unreviewed Kamaji Job: {name}')
-            wave=waves[name]
-            ann[ANN+'hook']='Sync'
-            ann[ANN+'hook-delete-policy']='BeforeHookCreation'
+        if component=='cert-manager':
+            allowed={('Job','cert-manager-startupapicheck'),
+                     ('ServiceAccount','cert-manager-startupapicheck'),
+                     ('Role','cert-manager-startupapicheck:create-cert'),
+                     ('RoleBinding','cert-manager-startupapicheck:create-cert')}
+            if hook!='post-install' or (kind,name) not in allowed:
+                raise ValueError(f'Unreviewed cert-manager hook: {kind}/{name}: {hook}')
+            # This must be Sync, not PostSync: later waves need working admission.
+            wave=5 if kind=='Job' else 1
+            if kind=='Job':
+                ann[ANN+'hook']='Sync'
+                ann[ANN+'hook-delete-policy']='BeforeHookCreation'
+        elif component=='kamaji':
+            if kind=='Job':
+                waves={'kamaji-etcd-setup-1':21,'kamaji-etcd-setup-2':31}
+                if name not in waves:raise ValueError(f'Unreviewed Kamaji Job: {name}')
+                wave=waves[name]
+                ann[ANN+'hook']='Sync'
+                ann[ANN+'hook-delete-policy']='BeforeHookCreation'
+            else:
+                wave=20 # Persistent SA/RBAC/config precede certificate-generation Job.
         else:
-            wave=20 # Persistent SA/RBAC/config precede certificate-generation Job.
+            raise ValueError(f'Unreviewed Helm hook: {component}/{name}: {hook}')
     if kind=='CustomResourceDefinition':wave=-20
     if kind=='DataStore':wave=32
     if kind=='MaintenanceOperatorConfig':wave=41

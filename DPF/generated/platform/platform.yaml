@@ -23225,6 +23225,141 @@ webhooks:
 ---
 apiVersion: v1
 kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: cert-manager-startupapicheck
+  namespace: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app: startupapicheck
+    app.kubernetes.io/name: startupapicheck
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: startupapicheck
+    app.kubernetes.io/version: v1.19.3
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: cert-manager-v1.19.3
+    customer.dpf.nvidia.com/component: cert-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-manager-startupapicheck:create-cert
+  namespace: cert-manager
+  labels:
+    app: startupapicheck
+    app.kubernetes.io/name: startupapicheck
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: startupapicheck
+    app.kubernetes.io/version: v1.19.3
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: cert-manager-v1.19.3
+    customer.dpf.nvidia.com/component: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+rules:
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificaterequests
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-manager-startupapicheck:create-cert
+  namespace: cert-manager
+  labels:
+    app: startupapicheck
+    app.kubernetes.io/name: startupapicheck
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: startupapicheck
+    app.kubernetes.io/version: v1.19.3
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: cert-manager-v1.19.3
+    customer.dpf.nvidia.com/component: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cert-manager-startupapicheck:create-cert
+subjects:
+- kind: ServiceAccount
+  name: cert-manager-startupapicheck
+  namespace: cert-manager
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cert-manager-startupapicheck
+  namespace: cert-manager
+  labels:
+    app: startupapicheck
+    app.kubernetes.io/name: startupapicheck
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: startupapicheck
+    app.kubernetes.io/version: v1.19.3
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: cert-manager-v1.19.3
+    customer.dpf.nvidia.com/component: cert-manager
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: '5'
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: startupapicheck
+        app.kubernetes.io/name: startupapicheck
+        app.kubernetes.io/instance: cert-manager
+        app.kubernetes.io/component: startupapicheck
+        app.kubernetes.io/version: v1.19.3
+        app.kubernetes.io/managed-by: Helm
+        helm.sh/chart: cert-manager-v1.19.3
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: cert-manager-startupapicheck
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: cert-manager-startupapicheck
+        image: quay.io/jetstack/cert-manager-startupapicheck:v1.19.3
+        imagePullPolicy: IfNotPresent
+        args:
+        - check
+        - api
+        - --wait=5m
+        - -v
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+---
+apiVersion: v1
+kind: ServiceAccount
 metadata:
   name: local-path-provisioner
   namespace: local-path-provisioner
