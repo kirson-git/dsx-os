@@ -10,6 +10,10 @@ configure the physical fabric. A full clean rebuild remains unqualified.
 
 ## 1. Install external Argo with Helm
 
+With Helm installed and kubectl configured for the management cluster, run from
+any directory. These commands use the [official Argo Helm repository](https://argoproj.github.io/argo-helm/)
+and the chart version pinned by this package:
+
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
@@ -18,6 +22,13 @@ helm install external-argo-cd argo/argo-cd \
   --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
   --wait --timeout 10m
+```
+
+Check the installation before continuing:
+
+```bash
+helm status external-argo-cd -n argocd
+kubectl get pods -n argocd
 ```
 
 Helm creates the Argo CRDs on this clean cluster: do not add

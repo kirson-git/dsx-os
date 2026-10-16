@@ -24,11 +24,38 @@ flowchart TD
     ServiceArgo --> Asia[Asia DPU: HBN]
 ```
 
-## Choose how to install DPF
+## Step 1: install external Argo CD
 
-First install external Argo with the Helm command in the
-[DPF guide](DPF/README.md#1-install-external-argo-with-helm), configure your site,
-and create the private BMC password Secret with `bash DPF/credentials.sh`.
+Start with a working Kubernetes cluster, Helm and kubectl configured for that
+cluster. For a clean cluster, run these commands from any directory:
+
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update argo
+helm install external-argo-cd argo/argo-cd \
+  --version 9.4.1 \
+  --namespace argocd --create-namespace \
+  --set configs.cm.installationID=dsx-platform \
+  --wait --timeout 10m
+```
+
+This installs external Argo CD and its CRDs. Version 9.4.1 is the chart pinned
+by this package. The installation ID distinguishes this controller from DPF's
+service Argo CD. See the [official chart repository](https://argoproj.github.io/argo-helm/).
+
+Check the installation:
+
+```bash
+helm status external-argo-cd -n argocd
+kubectl get pods -n argocd
+```
+
+## Step 2: configure and deploy DPF
+
+Follow the [DPF guide](DPF/README.md#2-set-the-dpu-bmc-ip-and-create-the-password-secret)
+to configure your site and create the private BMC password Secret with
+`bash DPF/credentials.sh`. Configure [private Git access](DPF/CREDENTIALS.md)
+so Argo can read this repository.
 
 | Option | Files | Behavior |
 | --- | --- | --- |
