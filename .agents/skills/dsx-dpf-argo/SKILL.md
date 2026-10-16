@@ -41,6 +41,14 @@ Do not claim a local edit changes what Argo reads from Git.
 
 ## Ownership and credentials
 
+- The [Bash menu](../../../DPF/INSTALLER.md) wraps Helm external Argo install,
+  private credential creation, the prepared single Application, status and a
+  scoped full teardown. Use `bash DPF/install.sh --config /path/to/install.yaml`.
+  `all` submits auto-sync asynchronously; it does not prove provisioning passed.
+  `delete-plan` is read only; `delete` needs the exact current context typed.
+  Full deletion includes external Argo only when explicitly requested, as here.
+  Shared consumers or orphaned platform ownership stop deletion. Never remove
+  Kubernetes/Calico CRDs or external host/DHCP/router configuration.
 - For the prepared full lab reinstall, follow
   [the two-command guide](../../../DPF/TWO-COMMAND-INSTALL.md). The private
   multi-source `dpf` Application owns the four stages; never combine it with

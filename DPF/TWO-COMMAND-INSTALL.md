@@ -1,5 +1,7 @@
 # Full DPF install in two commands
 
+For a menu that also installs or removes external Argo, use the [Bash installer](INSTALLER.md).
+
 Use this **after the agreed DPF cleanup**, with external Argo CD and management
 Kubernetes still running. Keep the Ubuntu hosts, DHCP reservations, switch and
 Internet router configuration. This installs DPF prerequisites, operator, tenants,
