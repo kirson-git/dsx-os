@@ -135,13 +135,15 @@ intended maintenance window. These Applications use manual sync and no pruning.
 The same readiness gates are included in their respective stages. Waves do not
 order separate Applications, so keep the command sequence above.
 
-| Stage | What it manages |
-| --- | --- |
-| Platform | Prerequisites, DPF operator and DPF service Argo |
-| Operator configuration | Site API endpoint, provisioning settings and MTUs |
-| Tenants | Europe and Asia namespaces and tenant control planes |
-| HBN | Interfaces, IPAM, service definitions and Europe chain |
-| Provisioning | Inventory, BFB/flavors, Europe DPUSet and Asia DPUDeployment |
+Files below are under `DPF/generated/applications/`:
+
+| Step | YAML | What it manages |
+| --- | --- | --- |
+| 1 | `00-platform.yaml` | Prerequisites, DPF operator and DPF service Argo |
+| 2 | `10-operator-config.yaml` | Site API endpoint, provisioning settings and MTUs |
+| 3 | `20-tenants.yaml` | Europe and Asia namespaces and tenant control planes |
+| 4 | `30-hbn.yaml` | Interfaces, IPAM, service definitions and Europe chain |
+| 5 | `40-provisioning.yaml` | Inventory, BFB/flavors, Europe DPUSet and Asia DPUDeployment |
 
 **Choose one option per installation.** Do not apply both over the same resources;
 they use different Argo ownership identities. Changing options on an existing
