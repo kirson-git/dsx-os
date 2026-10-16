@@ -24,7 +24,8 @@ flowchart TD
     ServiceArgo --> Asia[Asia DPU: HBN]
 ```
 
-Install external Argo with standard Helm, then apply the DPF Application YAMLs.
+Install external Argo with standard Helm, then choose one `DPF/install.yaml`
+or the separate stage YAMLs.
 No custom installation wrapper is required.
 
 Start with the [DPF installation guide](DPF/README.md), then review

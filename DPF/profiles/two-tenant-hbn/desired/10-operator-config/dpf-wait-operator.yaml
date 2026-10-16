@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dpf-wait-operator
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '65'
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1300
+  template:
+    spec:
+      serviceAccountName: dpf-install-checks
+      restartPolicy: Never
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: check
+        image: clastix/kubectl:v1.34
+        command:
+        - /bin/sh
+        - -ec
+        - 'kubectl wait -n dpf-operator-system dpfoperatorconfig/dpfoperatorconfig
+          --for=condition=Ready --timeout=600s
+
+          '

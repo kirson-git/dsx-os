@@ -45,6 +45,9 @@ class ExternalTests(unittest.TestCase):
                 cfg['externalArgo']['sameCluster']=same
                 cfg['externalArgo']['destinationName']='in-cluster' if same else 'dpf-management'
                 objects=external.generate(cfg,pathlib.Path(tmp)/'generated')
+                entry=yaml.safe_load((pathlib.Path(tmp)/'install.yaml').read_text())
+                self.assertEqual(entry['metadata']['name'],'dpf')
+                self.assertEqual(entry['spec']['destination']['name'],cfg['externalArgo']['destinationName'])
                 argo=[o for o in objects if o['kind']=='CustomResourceDefinition' and o['metadata']['name'].endswith('.argoproj.io')]
                 self.assertEqual(len(argo),0 if same else 3)
                 keys=[(o['apiVersion'],o['kind'],o['metadata'].get('namespace',''),o['metadata']['name']) for o in objects]

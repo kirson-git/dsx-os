@@ -1,63 +1,14 @@
 # Standalone DPF with external Argo CD
 
-Install the management prerequisites and DPF operator through an external
-platform Argo CD, then add the [two-tenant HBN profile](profiles/two-tenant-hbn/README.md).
-DPF's service Argo CD is a separate installation in `dpf-operator-system`.
+Install external Argo with standard Helm, configure your site and private
+credentials, then choose **one YAML** or **separate stage YAMLs**.
+Both options use the same underlying platform and profile manifests.
 
-Installation uses standard Helm first, then the checked-in Argo YAMLs.
-The Python renderer is optional tooling for maintainers who change chart settings.
-It has not completed a destructive clean-rebuild qualification. It does not
-install management Kubernetes, Ubuntu on the hosts, or the physical fabric.
-
-## Included components
-
-| Component | Pinned chart | Purpose |
-| --- | --- | --- |
-| External platform Argo | argo-cd 9.4.1 | GitOps controller for this stack |
-| DPF service Argo | argo-cd 9.4.1 | Deliver DPF-generated services into tenant clusters |
-| cert-manager | v1.19.3 | Certificates |
-| Kamaji | 1.2.0 | Tenant control planes and etcd |
-| Node Feature Discovery | 0.18.3 | Hardware features |
-| Maintenance Operator | 0.3.0 | Node maintenance coordination |
-| DPF operator | v26.4.0 | Provisioning and DPU service orchestration |
-| Local Path Provisioner, optional | 0.0.34 | Lab storage; replace for production |
-
-These are the inherited DPF 26.4.0 package pins. Do not infer that other Argo or
-Kubernetes versions are compatible without testing. See [provenance](SOURCES.txt)
-and NVIDIA's [prerequisites](https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites).
-
-## Starting point: clean Kubernetes cluster
-
-This guide starts after the previous installation has been removed, including
-its Argo, DPF and prerequisite CRDs. Kubernetes itself must be operational, with
-working networking and schedulable nodes. Cleanup is a separate operation; the
-commands below install the stack and do not delete the previous installation.
-
-Install external Argo first. It creates the Argo CRDs on this clean cluster.
-Then deploy these five Application YAMLs in order, syncing each at its documented
-stage. Each Application points to the underlying manifests in Git.
-
-| File under `DPF/generated/applications/` | Purpose |
-| --- | --- |
-| `00-platform.yaml` | Prerequisites, DPF operator and DPF service Argo |
-| `10-operator-config.yaml` | Site-specific DPF configuration |
-| `20-tenants.yaml` | Europe and Asia tenant control planes |
-| `30-hbn.yaml` | HBN interfaces, IPAM, services and networking definitions |
-| `40-provisioning.yaml` | Inventory, BFB/flavors and DPU provisioning |
-
-The package includes all five Application YAMLs and their referenced manifests.
-The public profile uses illustrative addresses and hardware identities: replace
-these with your reviewed site settings and supply credentials privately before
-syncing the profile. A complete clean rebuild has not yet been qualified.
+This guide starts with operational Kubernetes after the previous stack and its
+CRDs have been removed. It does not perform cleanup, install host Ubuntu or
+configure the physical fabric. A full clean rebuild remains unqualified.
 
 ## 1. Install external Argo with Helm
-
-Select the intended external-Argo cluster in your current kubectl configuration
-and confirm its identity. For a separate cluster, do this on the external cluster.
-These commands install a NEW controller; do not adopt an existing Helm release.
-The cluster needs schedulable nodes. On a tainted control-plane-only cluster,
-provide a reviewed Helm values file with matching workload and Redis-init-job
-tolerations; the default command does not add tolerations.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -69,111 +20,127 @@ helm install external-argo-cd argo/argo-cd \
   --wait --timeout 10m
 ```
 
-Do **not** add `--set crds.install=false` for this clean-cluster installation:
-Helm must create the Argo CRDs. `installationID=dsx-platform` identifies the
-external controller when DPF's separate service Argo is installed later.
+Helm creates the Argo CRDs on this clean cluster: do not add
+`--set crds.install=false`. The installation ID distinguishes external Argo from
+DPF's separate service Argo. Default Helm scheduling needs schedulable nodes;
+a tainted control-plane-only cluster needs reviewed workload/init-hook tolerations.
 
-Check that the CRDs are established and inspect the Argo pods:
+The default configuration installs external Argo in `argocd` on the same
+management cluster as DPF. Its destination is `in-cluster`; cluster registration
+is not required. Configure Argo access, authenticate your CLI or use its UI, and
+supply private Git access as described in [credentials](CREDENTIALS.md).
+Do not expand external Argo's Application watch scope to `dpf-operator-system`.
 
-```bash
-kubectl wait --for=condition=Established --timeout=60s \
-  crd/applications.argoproj.io \
-  crd/applicationsets.argoproj.io \
-  crd/appprojects.argoproj.io
-kubectl get pods -n argocd
-```
-
-The new controller watches its own namespace by default. Do not configure it
-to watch the DPF service Application namespace.
-
-Use the configured namespace if you changed it. Configure access and authenticate
-to this external Argo CLI/UI privately; no login credentials are in this repository.
-For an existing external installation, review its namespace watch scope, installation
-ID, CRDs and permissions instead of running this Helm command over it.
-
-The default YAMLs target `in-cluster`: external Argo is a separate installation
-on the DPF management cluster. No cluster-registration command is needed for this
-case. Give external Argo private Git access if required; see [credentials](CREDENTIALS.md).
-
-For external Argo on a **different cluster**, set `sameCluster: false`, use a
-registered remote `destinationName`, and re-render before applying. Register that
-DPF cluster privately with `argocd cluster add YOUR_CONTEXT --name dpf-management`.
-See the official [cluster registration contract](https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_cluster_add/).
-
-## 2. Install prerequisites and DPF from YAML
-
-Clone the repository to get the YAMLs (or use your own reviewed fork):
+## 2. Configure IPs and credentials
 
 ```bash
 git clone git@github.com:kirson-git/dsx-os.git
 cd dsx-os
 ```
 
-On the external-Argo cluster, create the platform Application and sync it:
+Follow [IP and password settings](CONFIGURATION.md). Replace the illustrative
+addresses, identities and selectors in the profile, then commit and push your
+reviewed configuration. Set the repository/revision in the chosen Application
+YAML(s) if using your own fork. Argo reads Git, not uncommitted local files.
+
+On the DPF management cluster, prepare the private BMC password before either
+full-stack installation option. On a clean cluster:
+
+```bash
+kubectl create namespace dpf-operator-system
+bash DPF/credentials.sh
+```
+
+The script prompts without echo and stores only a Kubernetes Secret. If the
+namespace already exists, omit the create command. Password files and production
+secret-manager options are covered in [CREDENTIALS.md](CREDENTIALS.md).
+
+## Option A: one YAML for the complete stack
+
+```bash
+kubectl apply -f DPF/install.yaml
+```
+
+This creates one Application named `dpf`. Automatic sync installs prerequisites,
+DPF, operator configuration, tenant control planes, HBN definitions and the
+provisioning resources. **After you configure real hardware, applying this file
+can initiate BFB installation/reprovisioning.** Prepare fabric and a maintenance
+window first. It does not automatically execute the external reboot method or
+release held node effects.
+
+Argo combines two sources: the rendered platform and the tenant/HBN profile.
+Resource waves order them within the same sync. Readiness Jobs wait for the DPF
+operator configuration and tenant APIs; a final gate checks that the BMC password
+Secret is present and nonempty before hardware resources are applied. That gate
+does not test BMC authentication. Failed gates stop later waves; fix the cause
+and retry sync in Argo. Pruning and self-heal are disabled.
+
+```bash
+argocd app get dpf
+```
+
+## Option B: separate YAMLs for control of each stage
+
+Apply and sync these in sequence instead of Option A:
 
 ```bash
 kubectl apply -f DPF/generated/applications/00-platform.yaml
 argocd app sync dpf-platform
 argocd app wait dpf-platform --sync --health --timeout 900
-```
 
-This single Application includes cert-manager, optional storage, Kamaji/etcd,
-NFD, Maintenance Operator, DPF operator and the separate service Argo. Resource
-waves order their installation. Kamaji setup hooks create runtime certificates;
-no certificate or password data is committed here.
-
-On this fresh shared cluster, external Argo's Helm bootstrap owns Argo CRDs
-and the service chart omits them. On separate clusters, the service chart
-includes CRDs on the DPF cluster. The controllers have distinct installation IDs
-and watch their own Application namespaces. See
-[resource tracking](https://argo-cd.readthedocs.io/en/stable/user-guide/resource_tracking/).
-
-## 3. Configure tenants, HBN and hardware
-
-First replace every site/hardware input in the
-[profile](profiles/two-tenant-hbn/README.md). The checked-in examples cannot provision
-your real hardware unchanged. Commit the reviewed changes before these commands.
-
-```bash
 kubectl apply -f DPF/generated/applications/10-operator-config.yaml
 argocd app sync dpf-operator-config
+
 kubectl apply -f DPF/generated/applications/20-tenants.yaml
 argocd app sync dpf-tenants
-```
 
-On the DPF management cluster, check controller and tenant readiness:
-
-```bash
-kubectl wait -n dpf-operator-system dpfoperatorconfig/dpfoperatorconfig \
-  --for=condition=Ready --timeout=600s
-kubectl wait -n tenant-europe dpucluster/tenant-europe \
-  --for=jsonpath='{.status.phase}'=Ready --timeout=600s
-kubectl wait -n tenant-asia dpucluster/tenant-asia \
-  --for=jsonpath='{.status.phase}'=Ready --timeout=600s
-```
-
-Then, on the external-Argo cluster:
-
-```bash
 kubectl apply -f DPF/generated/applications/30-hbn.yaml
 argocd app sync dpf-hbn
-```
 
-After [private BMC credential setup](CREDENTIALS.md), fabric readiness and the
-hardware maintenance window are
-in place, explicitly submit provisioning. This can install a BFB/reimage DPUs:
-
-```bash
 kubectl apply -f DPF/generated/applications/40-provisioning.yaml
 argocd app sync dpf-provisioning
 ```
 
-All five Applications use manual sync, no pruning and no deletion finalizer.
-Waves inside one Application do not order the separate Applications. Keep the
-steps above explicit until the complete workflow is qualified. External reboot
-and held node effects still need operator handling; see the profile.
+The `argocd app sync` commands wait for their sync operation by default. Proceed
+after each succeeds. Provisioning can reimage DPUs; run that last sync in the
+intended maintenance window. These Applications use manual sync and no pruning.
+The same readiness gates are included in their respective stages. Waves do not
+order separate Applications, so keep the command sequence above.
 
-## 4. Verify the restored outcome
+| Stage | What it manages |
+| --- | --- |
+| Platform | Prerequisites, DPF operator and DPF service Argo |
+| Operator configuration | Site API endpoint, provisioning settings and MTUs |
+| Tenants | Europe and Asia namespaces and tenant control planes |
+| HBN | Interfaces, IPAM, service definitions and Europe chain |
+| Provisioning | Inventory, BFB/flavors, Europe DPUSet and Asia DPUDeployment |
+
+**Choose one option per installation.** Do not apply both over the same resources;
+they use different Argo ownership identities. Changing options on an existing
+installation requires an ownership migration. Both omit deletion finalizers, so
+deleting the Application does not uninstall its resources.
+
+## Included prerequisites and ownership
+
+| Component | Pinned chart |
+| --- | --- |
+| External platform Argo and DPF service Argo | argo-cd 9.4.1 |
+| cert-manager | v1.19.3 |
+| Kamaji | 1.2.0 |
+| Node Feature Discovery | 0.18.3 |
+| Maintenance Operator | 0.3.0 |
+| DPF operator | v26.4.0 |
+| Local Path Provisioner, optional lab storage | 0.0.34 |
+
+External Argo owns the platform and root profile objects. The DPF service Argo
+in `dpf-operator-system` delivers DPF-generated services to tenant clusters.
+It reuses the external bootstrap's Argo CRDs on this shared cluster and has its
+own installation ID and Application namespace watch scope. Never add generated
+DPF children, runtime kubeconfigs or Secret data to either public profile.
+See [provenance](SOURCES.txt) and the pinned
+[NVIDIA prerequisites](https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites).
+
+## Verify the restored outcome
 
 On the management cluster:
 
@@ -185,19 +152,19 @@ kubectl get applications -n dpf-operator-system
 kubectl get pods -n dpf-operator-system
 ```
 
-These are inventory checks, not complete acceptance. Inspect the generated service
-Applications and HBN pods in each tenant, then validate host gateway/DNS/HTTPS,
-source interface, BGP/EVPN, return routing and cross-tenant isolation. The
-[profile guide](profiles/two-tenant-hbn/README.md) defines these boundaries.
+Inspect each tenant's HBN workloads, BGP/EVPN, host gateway/DNS/HTTPS, data source
+interface and management access. Test both-direction tenant isolation with a
+positive control proving the destination is alive. Argo Synced and a failed ping
+alone do not establish the full outcome. See the
+[profile](profiles/two-tenant-hbn/README.md), [fabric contract](profiles/two-tenant-hbn/FABRIC.md),
+[production changes](PRODUCTION.md), [recovery](RECOVERY.md) and
+[validation](VALIDATION.md). NICo integration is separate: [NICo/](../NICo/README.md).
 
-## Cleanup and production
-
-Read [production changes](PRODUCTION.md) and [teardown/recovery](RECOVERY.md).
-No blanket cluster deletion command is provided: shared services, persistent
-state and hardware lifecycle must be scoped before teardown.
-
-Validation record: [VALIDATION.md](VALIDATION.md). The future NICo integration
-is separate: [NICo/](../NICo/README.md).
+For external Argo on another cluster, set `sameCluster: false`, register the DPF
+cluster privately, set its `destinationName`, and re-render before applying.
+This also installs the service Argo CRDs on the remote DPF cluster. Create BMC
+credentials on that DPF cluster, and apply the Application YAML on the external
+Argo cluster. Qualify this topology before using it for recovery.
 
 ## Maintainer option: re-render after changing chart settings
 
@@ -230,10 +197,10 @@ Edit `DPF/site.yaml`:
 - `argoNamespace`: service Argo namespace; this package requires `dpf-operator-system`.
 
 The default `operator.enabled: false` still installs the operator chart. It omits
-DPFOperatorConfig because the separate profile Application owns that configuration.
-Keep `operator.enabled` and `tenants.enabled` false when using the profile, to
-avoid assigning the same resources to two Applications. If you choose the optional
-legacy tenant renderer instead, do not apply the profile's corresponding resources.
+DPFOperatorConfig because the profile owns that configuration.
+Keep `operator.enabled` and `tenants.enabled` false when using either full-profile
+option, to avoid duplicate configuration. The one-file entry point is generated
+only with those legacy configuration flags disabled.
 
 Render into a new directory (nonempty output is rejected to prevent accidental overwrite):
 
@@ -241,7 +208,8 @@ Render into a new directory (nonempty output is rejected to prevent accidental o
 python3 DPF/tools/external.py --config DPF/site.yaml --output /tmp/dsx-rendered
 ```
 
-Review the result, replace `DPF/generated/` with the reviewed output, and commit
+The renderer also writes `install.yaml` beside the output directory. Review both
+outputs, update `DPF/install.yaml` and `DPF/generated/`, and commit
 and push your changes before syncing Argo. `DPF/generated/platform/` is the Git
 path used by the example Application. Rendering prints each actual Helm template
 command and does not contact Kubernetes. `tools/render.py` is an internal inherited

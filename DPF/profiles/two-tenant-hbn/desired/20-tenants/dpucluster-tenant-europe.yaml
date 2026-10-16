@@ -6,7 +6,7 @@ metadata:
   labels:
     training.dpf.nvidia.com/tenant: europe
   annotations:
-    argocd.argoproj.io/sync-wave: '0'
+    argocd.argoproj.io/sync-wave: '70'
 spec:
   clusterEndpoint:
     keepalived:

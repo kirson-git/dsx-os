@@ -63,6 +63,20 @@ def application(cfg, name, path):
     return obj
 
 
+def single_application(cfg):
+    """One Application merges platform and profile, using shared resource waves."""
+    if cfg['operator']['enabled'] or cfg.get('tenants', {}).get('enabled', False):
+        raise ValueError('The full profile owns operator/tenant configuration; keep legacy operator.enabled and tenants.enabled false')
+    obj = application(cfg, 'dpf', cfg['git']['path'])
+    platform = obj['spec'].pop('source')
+    profile = copy.deepcopy(platform)
+    profile['path'] = 'DPF/profiles/two-tenant-hbn/desired'
+    profile['directory']['recurse'] = True
+    obj['spec']['sources'] = [platform, profile]
+    obj['spec']['syncPolicy']['automated'] = {'prune': False, 'selfHeal': False}
+    return obj
+
+
 def service_object(obj):
     obj = copy.deepcopy(obj)
     meta = obj['metadata']
@@ -116,6 +130,8 @@ def generate(cfg, output):
     for stage in ['10-operator-config', '20-tenants', '30-hbn', '40-provisioning']:
         obj = application(cfg, 'dpf-' + stage[3:], profile_path + '/' + stage)
         (applications / (stage + '.yaml')).write_text(yaml.safe_dump(obj, sort_keys=False))
+    if not cfg['operator']['enabled'] and not cfg.get('tenants', {}).get('enabled', False):
+        (output.parent / 'install.yaml').write_text(yaml.safe_dump(single_application(cfg), sort_keys=False))
     report = {'site': cfg, 'resources': len(objects), 'platformSHA256': hashlib.sha256(payload.encode()).hexdigest(),
               'validation': 'Offline render only; no live install, migration, cleanup or DPU provisioning performed.'}
     (output / 'render-report.json').write_text(json.dumps(report, indent=2) + '\n')

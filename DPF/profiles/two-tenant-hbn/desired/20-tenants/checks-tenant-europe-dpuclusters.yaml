@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dpf-install-checks-dpuclusters
+  namespace: tenant-europe
+  annotations:
+    argocd.argoproj.io/sync-wave: '70'
+rules:
+- apiGroups:
+  - provisioning.dpu.nvidia.com
+  resources:
+  - dpuclusters
+  resourceNames:
+  - tenant-europe
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpf-install-checks-dpuclusters
+  namespace: tenant-europe
+  annotations:
+    argocd.argoproj.io/sync-wave: '70'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dpf-install-checks-dpuclusters
+subjects:
+- kind: ServiceAccount
+  name: dpf-install-checks
+  namespace: dpf-operator-system

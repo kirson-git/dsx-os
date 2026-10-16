@@ -9,7 +9,7 @@ metadata:
     provisioning.dpu.nvidia.com/dpudevice-psid: EXAMPLEEUROPE
     provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-europe
   annotations:
-    argocd.argoproj.io/sync-wave: '0'
+    argocd.argoproj.io/sync-wave: '90'
 spec:
   bmcIp: 192.0.2.146
   bmcPort: 443

@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dpf-install-checks-dpfoperatorconfigs
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '60'
+rules:
+- apiGroups:
+  - operator.dpu.nvidia.com
+  resources:
+  - dpfoperatorconfigs
+  resourceNames:
+  - dpfoperatorconfig
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpf-install-checks-dpfoperatorconfigs
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '60'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dpf-install-checks-dpfoperatorconfigs
+subjects:
+- kind: ServiceAccount
+  name: dpf-install-checks
+  namespace: dpf-operator-system

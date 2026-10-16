@@ -1,0 +1,39 @@
+# One-file full-stack entry point. Configure site inputs and credentials before applying.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf
+  namespace: argocd
+  labels:
+    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+    automated:
+      prune: false
+      selfHeal: false
+  sources:
+  - repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/generated/platform
+    directory:
+      recurse: false
+      include: '*.yaml'
+  - repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/profiles/two-tenant-hbn/desired
+    directory:
+      recurse: true
+      include: '*.yaml'

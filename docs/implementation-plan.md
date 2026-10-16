@@ -21,7 +21,8 @@ and provenance are in ../DPF/SOURCES.txt.
 - Never commit credentials, private keys, kubeconfigs or raw live snapshots.
 - Keep controller namespaces, installation IDs and Application ownership distinct.
 - Keep generated DPF children outside external Argo desired state.
-- Require separate, manual provisioning sync; it can reimage hardware.
+- Offer one automatic full-stack Application or separate manual stages;
+  document that either can reimage hardware when provisioning begins.
 - Record unsupported/recovery steps and qualification honestly.
 
 ## Tasks
@@ -49,3 +50,7 @@ with a private-input BMC helper and documented external-secret-manager option.
 Clean-cluster clarification: bootstrap Helm installs fresh Argo CRDs. The external
 installation retains its distinct installation ID; the later service Argo omits
 shared CRDs. The guide lists all five Application YAMLs and their sync order.
+
+User refinement: support both one-file and separate-stage deployment using the
+same manifests. Supply credentials with a Bash helper; document BMC IP/password
+separately from DPU Arm OS management IP/SSH credentials and HBN data pools.

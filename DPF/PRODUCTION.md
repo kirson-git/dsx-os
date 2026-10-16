@@ -27,9 +27,9 @@ The sample profile uses two distinct IPv4 prefixes. Supporting overlapping tenan
 addresses requires distinct routing and conntrack/NAT domains. The lab's IPv4
 Internet result does not qualify IPv6 or every protocol for isolation.
 
-The checked-in Argo Applications initially use the default project and manual sync.
-Restrict project scope before production. Enable automatic sync/pruning only after
-reviewing ownership and destructive hardware consequences; do not add DPF-generated
+The one-file Application uses automatic sync; the separate stage Applications
+use manual sync. All use the default project and disable pruning. Restrict project
+scope and review hardware consequences before production; do not add DPF-generated
 Applications or generated child resources to external Argo desired state.
 
 Do not use the standalone provisioning example for the future NICo-managed stack.

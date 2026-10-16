@@ -54,10 +54,12 @@ contained `passthrough`, which did not describe the final service chain.
 
 ## Sync sequence and acceptance
 
-Install the platform first. Sync operator configuration, then tenant namespaces
-and DPUClusters. Check tenant API readiness before HBN definitions and hardware
-provisioning. Argo sync waves order resources within one Application; they do
-not order these separate Applications. Provisioning requires its own manual sync.
+Choose the one-file or separate-stage workflow in the main installation guide.
+Both use the same manifests. Global waves order operator configuration, tenant
+APIs, HBN and provisioning; read-only Jobs gate readiness and BMC Secret presence.
+With one Application these waves form one sync. With separate Applications,
+sync each stage in sequence; provisioning is the final explicit sync. Do not
+combine the two ownership models on one installation.
 
 The host configuration must be installed on Ubuntu through your provisioning
 system, using management-path preservation and a timed rollback. Copying host

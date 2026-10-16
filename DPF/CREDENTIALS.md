@@ -14,24 +14,27 @@ BMC authentication; verify the supported BMC model and credential state before
 provisioning. See the pinned
 [DPF HBN instructions](https://github.com/NVIDIA/doca-platform/blob/v26.4.0/docs/public/user-guides/zero-trust/use-cases/hbn/README.md).
 
-After the platform creates `dpf-operator-system`, select the DPF management
-cluster and enter the password at the hidden prompt:
+Select the DPF management cluster and create `dpf-operator-system` if absent
+before the one-file install (or after the separate platform stage). Enter the
+password at the hidden prompt:
 
 ```bash
 kubectl config current-context
-python3 DPF/tools/credentials.py
+bash DPF/credentials.sh
 ```
 
 Alternatively, supply an existing private file outside the checkout:
 
 ```bash
-python3 DPF/tools/credentials.py --password-file /secure/private/bmc-password
+bash DPF/credentials.sh --password-file /secure/private/bmc-password
 ```
 
-The file must be readable only by its owner (mode 600), contain the password with
-no trailing newline, and remain outside Git. The helper passes the Secret through
-kubectl stdin, does not write a manifest to disk, does not print the value and does
-not put it in process arguments. It uses server-side apply without force-conflicts;
+The file must be readable only by its owner (mode 600 or 400), contain the
+password with
+no trailing newline, and remain outside Git. The Bash helper uses a private
+temporary directory outside Git and removes it
+on exit. It passes the Secret through kubectl stdin, does not print the value
+and does not put it in process arguments. It uses server-side apply without force-conflicts;
 another secret manager's ownership conflict must be resolved deliberately.
 The helper changes only the Kubernetes Secret; it does not test BMC authentication.
 

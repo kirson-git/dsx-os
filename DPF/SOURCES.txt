@@ -84,6 +84,14 @@ DSX OS external-Argo adaptation, 2026-10-16:
   the service Argo; its Redis init hook uses persistent RBAC then a Sync Job.
 - External Argo bootstrap owns Argo CRDs on a shared cluster; on separate clusters
   the service chart installs its own cluster's CRDs. Installation IDs and namespace
-  watch scopes are distinct. Initial Application sync is manual, without pruning.
+  watch scopes are distinct. Separate stage Applications sync manually; the
+  one-file full-stack Application syncs automatically, without pruning.
 - profiles/two-tenant-hbn models the observed lab root resources using illustrative
   addresses and hardware identities. It includes no live credentials or raw logs.
+
+One-file/profile adaptation:
+- install.yaml combines platform and profile sources into one Application. Global
+  sync waves and scoped readiness Jobs gate operator readiness, tenant readiness
+  and BMC Secret presence before hardware provisioning.
+- credentials.sh supplies the private shared BMC password via Bash; temporary
+  files are private, outside the checkout, and removed after use.

@@ -8,7 +8,7 @@ metadata:
     training.dpf.nvidia.com/selected: 'true'
     training.dpf.nvidia.com/tenant: europe
   annotations:
-    argocd.argoproj.io/sync-wave: '1'
+    argocd.argoproj.io/sync-wave: '91'
 spec:
   dpus:
   - name: example-europe
