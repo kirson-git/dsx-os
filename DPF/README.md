@@ -142,6 +142,19 @@ Create the private BMC Secret using the [credential guide](CREDENTIALS.md) befor
 provisioning. [All separate steps](STAGED-INSTALL.md) ·
 [Production settings](PRODUCTION.md) · [Configuration details](CONFIGURATION.md)
 
+## After tenants: HBN and hardware
+
+The public `30-hbn` and `40-provisioning` manifests are **examples**. Before
+syncing them, replace the BMC addresses, serials, node selectors, HBN hostname
+patterns, DNS and IPAM pools with verified site settings. `config.yaml` configures
+the operator and tenant APIs; it does not yet override those hardware settings.
+See the [profile requirements](profiles/two-tenant-hbn/README.md#required-edits).
+
+Both stage directories support Argo `spec.source.kustomize.patches` for local
+Application overrides. Remove `spec.source.directory` when using Kustomize.
+Keep passwords in the BMC Secret and private MAC reservations outside public Git.
+Keep these stages manually synced: provisioning can reimage DPUs.
+
 ## Existing Argo — apply the startup fix once
 
 For the package's external Argo release on chart **9.4.1**, keep existing Helm

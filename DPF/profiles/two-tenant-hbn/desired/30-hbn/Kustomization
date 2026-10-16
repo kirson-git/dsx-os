@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- dpuservice-doca-hbn-europe.yaml
+- dpuservicechain-europe-hbn.yaml
+- dpuserviceconfiguration-doca-hbn-asia.yaml
+- dpuserviceinterface-asia-p0.yaml
+- dpuserviceinterface-asia-p1.yaml
+- dpuserviceinterface-asia-pf0hpf.yaml
+- dpuserviceinterface-europe-hbn-p0.yaml
+- dpuserviceinterface-europe-hbn-p1.yaml
+- dpuserviceinterface-europe-hbn-pf0hpf.yaml
+- dpuserviceinterface-europe-p0.yaml
+- dpuserviceinterface-europe-p1.yaml
+- dpuserviceinterface-europe-pf0hpf.yaml
+- dpuserviceinterface-europe-pf1hpf.yaml
+- dpuserviceipam-asia-host.yaml
+- dpuserviceipam-asia-loopback.yaml
+- dpuserviceipam-europe-host.yaml
+- dpuserviceipam-europe-loopback.yaml
+- dpuservicetemplate-doca-hbn-asia.yaml
