@@ -1,5 +1,9 @@
 # Separate YAMLs: full installation walkthrough
 
+For the simpler one-file workflow, use [the DPF README](README.md).
+This manual workflow is an alternative: do not combine its operator/tenant
+Applications with `dpf-site`.
+
 This is the advanced Git-managed path. For local IP overrides without a fork,
 use the [short guide](README.md). Choose one ownership model per cluster.
 

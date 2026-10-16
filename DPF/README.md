@@ -1,49 +1,32 @@
 # Install DPF with Argo CD
 
-**Edit [dpf-site.yaml](dpf-site.yaml).** It already contains our lab IPs.
-For another environment, change the lines marked `# please change here`.
-Passwords stay outside Git. No Git clone or push is needed to use your local
-IP overrides.
-
-This file configures DPF and the Europe/Asia tenants **after platform installation**.
-It contains two Applications; sync them in order below. HBN and DPU provisioning
-are later steps, covered by the [full walkthrough](STAGED-INSTALL.md).
+**One file to edit: [config.yaml](config.yaml).** It contains the Kubernetes API,
+tenant VIPs, optional DHCP and MAC reservations. Argo reads the templates from
+Git. Passwords stay outside Git; the public file has blank MAC fields.
 
 ## How it fits together
 
 ```mermaid
-flowchart TD
-    Git["Git: installation YAMLs"] --> Argo["External Argo CD"]
-    Site["Your dpf-site.yaml: IP settings"] --> Argo
-    Argo --> Prereqs["Prerequisites: cert-manager, storage, Kamaji, NFD, Maintenance"]
-    Argo --> DPF["DPF operator: provisioning and services"]
-    Prereqs --> Tenants["Kamaji: Europe / Asia tenant Kubernetes APIs"]
-    DPF -->|"OS / firmware provisioning via BMC"| DPUs["Europe / Asia DPUs"]
-    DPF --> ServiceArgo["DPF service Argo CD"]
-    ServiceArgo -->|"Containers such as HBN"| DPUs
-    DPUs -->|"Join their tenant"| Tenants
-    DHCP["External DHCP: management IPs"] -.-> DPUs
+flowchart TB
+    subgraph K8S["1. Management Kubernetes cluster — 3 nodes"]
+        Argo["External Argo CD"]
+        Prereqs["Storage · cert-manager · Kamaji · NFD · Maintenance"]
+        DPF["2. DPF operator and controllers"]
+        Argo --> Prereqs
+        Argo --> DPF
+        Prereqs --> DPF
+    end
+    subgraph Devices["3. DPUs we want to configure"]
+        Europe["Europe DPU · Europe tenant"]
+        Asia["Asia DPU · Asia tenant"]
+    end
+    DPF -->|"Provision OS and deploy DPU services"| Europe
+    DPF -->|"Provision OS and deploy DPU services"| Asia
 ```
 
-## Where DHCP is needed
-
-For this lab, provide DHCP on the **DPU management/OOB and BMC network before
-DPU provisioning**. Use MAC reservations so addresses stay predictable. The DPU
-BMC address entered in its later inventory YAML must match its actual address.
-A customer can use preconfigured static management/BMC addressing instead where
-supported by their hardware and OS provisioning setup.
-
-| Address | Our lab | Assignment |
-| --- | --- | --- |
-| Management Kubernetes API | `10.220.175.20:6443` | Existing stable endpoint |
-| Europe / Asia tenant VIP | `192.168.0.200` / `192.168.0.203` | Manual YAML values; keep outside DHCP leases |
-| Europe / Asia DPU management | `192.168.0.244` / `192.168.0.242` | DHCP reservations; separate from VIPs |
-| Europe / Asia DPU BMC | `192.168.0.246` / `192.168.0.249` | DHCP reservations; later provisioning inputs |
-
-Our DHCP service is **dnsmasq on `l-ae-1137d` (`192.168.0.1`)**, outside Kubernetes:
-`nico-lab-dhcp`, configuration `/etc/nico-lab-dhcp.conf`.
-**This Argo package does not install DHCP.** Reinstalling DPF does not replace it.
-The current site file changes the API/VIPs, not DHCP reservations or DPU IPs.
+The steps below install prerequisites, configure DPF and create both tenant APIs.
+**HBN and hardware provisioning follow later.** Applying this configuration does
+not reimage DPUs.
 
 ## Step 1 — External Argo CD and DPF platform
 
@@ -79,55 +62,75 @@ this command prints `Succeeded`:
 kubectl -n argocd get application dpf-platform -o jsonpath='{.status.operationState.phase}{"\n"}'
 ```
 
-## Step 2 — Edit your file and configure DPF
+## Step 2 — Edit your one configuration file
+
+For a new customer, download the public template:
 
 ```bash
 curl -fL \
-  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/dpf-site.yaml \
-  -o dpf-site.yaml
-vi dpf-site.yaml
-kubectl apply -f dpf-site.yaml
-kubectl -n argocd patch application dpf-operator-config --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
-kubectl -n argocd get application dpf-operator-config -w
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml \
+  -o config.yaml
+vi config.yaml
 ```
 
-Our lab values are ready to use; review them before applying. Wait for sync to
-finish, press Ctrl+C, then verify `Succeeded` before step 3:
+For our lab, the populated file is already on the administration server:
 
 ```bash
-kubectl -n argocd get application dpf-operator-config -o jsonpath='{.status.operationState.phase}{"\n"}'
+cd /tmp/dpf-lab
+vi config.yaml
 ```
 
-Do not overwrite an already customized local file with another download.
-Do not reapply generic operator/tenant Applications afterward, as those would
-replace your overrides.
+Use **one** of these paths; do not overwrite your populated file with a download.
+Review the lines marked `# please change here`:
 
-## Step 3 — Create Europe and Asia
+| Setting | What it means |
+| --- | --- |
+| `apiServerIP` | Existing management Kubernetes API; our lab uses `10.220.175.20:6443` |
+| `vipInterface` | Management-node interface carrying tenant VIPs; lab `enp7s0` |
+| `europeVIP` / `asiaVIP` | Reserved floating IPs `.200` / `.203`; never DHCP allocations |
+| `install-dhcp` | Quoted `"no"` uses existing DHCP; quoted `"yes"` installs the DHCP pod |
+| `dhcp.reservations` | Management MAC and reserved IP for each device; fill blanks before enabling DHCP |
+
+**Keep `install-dhcp: "no"` for the first DPF test.** Our existing DHCP still
+serves the lab. To move it into Kubernetes, follow the [DHCP cutover](DHCP.md).
+
+## Step 3 — Apply and check
+
+Run from the directory containing your edited `config.yaml`:
 
 ```bash
-kubectl -n argocd patch application dpf-tenants --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
-kubectl -n argocd get application dpf-tenants -w
+kubectl apply -f config.yaml
+kubectl -n argocd get application dpf-site -w
 ```
 
-After sync finishes, press Ctrl+C and check:
+Sync starts automatically: DPF configuration first, then Europe and Asia.
+Press Ctrl+C to stop watching; installation continues. Check the result:
 
 ```bash
-kubectl -n argocd get application dpf-tenants -o jsonpath='{.status.operationState.phase}{"\n"}'
+kubectl -n argocd get application dpf-site -o jsonpath='{.status.operationState.phase}{"\n"}{.status.operationState.message}{"\n"}'
 kubectl get dpuclusters -A
 ```
 
-Expect a successful operation and two Ready tenant clusters. DPUs join later;
-this does not yet install HBN or reimage hardware.
+Expect `Succeeded` and two `Ready` tenant clusters. DPUs join in the later
+provisioning stage. If sync fails, read its message before retrying.
+
+Do not combine `dpf-site` with the older `dpf-operator-config`, `dpf-tenants`, or
+full-stack `dpf` Applications: they own the same resources. The separate
+`dpf-platform` Application from Step 1 is required and compatible.
+
+## Where DHCP is needed
+
+DHCP supplies **DPU management/OOB IPs** before provisioning. Our lab also uses
+reservations for BMCs, iDRACs and Asia's host management NIC. Tenant VIPs are manual.
+`apiServerIP` points to an existing API; this chart does not create a management
+API VIP. For HA, supply an existing load-balanced Kubernetes API endpoint.
+
+Our existing DHCP is dnsmasq (`nico-lab-dhcp`) on `l-ae-1137d`, configuration
+`/etc/nico-lab-dhcp.conf`. Its DHCP server address is `192.168.0.129`.
+The Kubernetes option is disabled until that service and address are migrated.
+See [DHCP settings and NICo differences](DHCP.md).
 
 **Next:** [HBN and DPU provisioning](STAGED-INSTALL.md#7-apply-hbn-networking).
-Create the private BMC Secret with `DPF/credentials.sh` before that provisioning
-stage. The [credential guide](CREDENTIALS.md) has the exact commands.
-
-[All separate apply/sync steps](STAGED-INSTALL.md) ·
-[Full-stack single Application](INSTALLATION-DETAILS.md#option-a-one-yaml-for-the-complete-stack) ·
-[Production settings](PRODUCTION.md) · [Agent rules](../AGENTS.md)
-
-The full-stack Application owns overlapping resources: use it only as a separate
-installation option, not together with the staged Applications above.
+Create the private BMC Secret using the [credential guide](CREDENTIALS.md) before
+provisioning. [All separate steps](STAGED-INSTALL.md) ·
+[Production settings](PRODUCTION.md) · [Configuration details](CONFIGURATION.md)

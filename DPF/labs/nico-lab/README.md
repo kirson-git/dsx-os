@@ -1,5 +1,9 @@
 # Configure the NICo lab through Argo CD
 
+For the simpler one-file workflow, use [the DPF README](../../README.md).
+This manual workflow is an alternative: do not combine its operator/tenant
+Applications with `dpf-site`.
+
 Requires `dpf-platform` to be Synced / Healthy. No Git clone is needed.
 This file configures the operator and two tenants; HBN/hardware configuration
 remains a later step.
@@ -62,9 +66,9 @@ kubectl get dpuclusters -A
 ```bash
 curl -fL \
   https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/labs/nico-lab/applications.yaml \
-  -o dpf-site.yaml
-vi dpf-site.yaml
-kubectl apply -f dpf-site.yaml
+  -o lab-applications.yaml
+vi lab-applications.yaml
+kubectl apply -f lab-applications.yaml
 ```
 
 Edit the `value:` entries under `spec.source.kustomize.patches`. Then run the

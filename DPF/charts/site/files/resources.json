@@ -1,0 +1,432 @@
+[
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "Role",
+    "metadata": {
+      "name": "dpf-install-checks-dpfoperatorconfigs",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    },
+    "rules": [
+      {
+        "apiGroups": [
+          "operator.dpu.nvidia.com"
+        ],
+        "resources": [
+          "dpfoperatorconfigs"
+        ],
+        "resourceNames": [
+          "dpfoperatorconfig"
+        ],
+        "verbs": [
+          "get",
+          "list",
+          "watch"
+        ]
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "RoleBinding",
+    "metadata": {
+      "name": "dpf-install-checks-dpfoperatorconfigs",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    },
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "Role",
+      "name": "dpf-install-checks-dpfoperatorconfigs"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "dpf-install-checks",
+        "namespace": "dpf-operator-system"
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "Role",
+    "metadata": {
+      "name": "dpf-install-checks-secrets",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    },
+    "rules": [
+      {
+        "apiGroups": [
+          ""
+        ],
+        "resources": [
+          "secrets"
+        ],
+        "resourceNames": [
+          "bmc-shared-password"
+        ],
+        "verbs": [
+          "get"
+        ]
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "RoleBinding",
+    "metadata": {
+      "name": "dpf-install-checks-secrets",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    },
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "Role",
+      "name": "dpf-install-checks-secrets"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "dpf-install-checks",
+        "namespace": "dpf-operator-system"
+      }
+    ]
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "ServiceAccount",
+    "metadata": {
+      "name": "dpf-install-checks",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    }
+  },
+  {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "name": "dpf-wait-operator",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "65",
+        "argocd.argoproj.io/hook": "Sync",
+        "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation"
+      }
+    },
+    "spec": {
+      "backoffLimit": 0,
+      "activeDeadlineSeconds": 1300,
+      "template": {
+        "spec": {
+          "serviceAccountName": "dpf-install-checks",
+          "restartPolicy": "Never",
+          "tolerations": [
+            {
+              "key": "node-role.kubernetes.io/control-plane",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            },
+            {
+              "key": "node-role.kubernetes.io/master",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            }
+          ],
+          "containers": [
+            {
+              "name": "check",
+              "image": "clastix/kubectl:v1.34",
+              "command": [
+                "/bin/sh",
+                "-ec",
+                "kubectl wait -n dpf-operator-system dpfoperatorconfig/dpfoperatorconfig --for=condition=SystemComponentsReconciled --timeout=600s\n"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "operator.dpu.nvidia.com/v1alpha1",
+    "kind": "DPFOperatorConfig",
+    "metadata": {
+      "name": "dpfoperatorconfig",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "60"
+      }
+    },
+    "spec": {
+      "dpuDetector": {
+        "disable": true
+      },
+      "kamajiClusterManager": {
+        "disable": false,
+        "replicas": 2
+      },
+      "networking": {
+        "controlPlaneMTU": 1500,
+        "highSpeedMTU": 1500
+      },
+      "overrides": {
+        "kubernetesAPIServerPort": 6443,
+        "kubernetesAPIServerVIP": "198.51.100.20",
+        "argoCDNamespace": "dpf-operator-system"
+      },
+      "provisioningController": {
+        "dmsTimeout": 900,
+        "installInterface": {
+          "installViaRedfish": {
+            "skipDPUNodeDiscovery": false
+          }
+        },
+        "maxDPUParallelInstallations": 50,
+        "maxUnavailableDPUNodes": 50,
+        "multiDPUOperationsSyncWaitTime": "30s",
+        "nodeEffectRemovalTimeout": "0s",
+        "osInstallTimeout": "45m",
+        "replicas": 2
+      }
+    }
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "Role",
+    "metadata": {
+      "name": "dpf-install-checks-dpuclusters",
+      "namespace": "tenant-asia",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "rules": [
+      {
+        "apiGroups": [
+          "provisioning.dpu.nvidia.com"
+        ],
+        "resources": [
+          "dpuclusters"
+        ],
+        "resourceNames": [
+          "tenant-asia"
+        ],
+        "verbs": [
+          "get",
+          "list",
+          "watch"
+        ]
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "RoleBinding",
+    "metadata": {
+      "name": "dpf-install-checks-dpuclusters",
+      "namespace": "tenant-asia",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "Role",
+      "name": "dpf-install-checks-dpuclusters"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "dpf-install-checks",
+        "namespace": "dpf-operator-system"
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "Role",
+    "metadata": {
+      "name": "dpf-install-checks-dpuclusters",
+      "namespace": "tenant-europe",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "rules": [
+      {
+        "apiGroups": [
+          "provisioning.dpu.nvidia.com"
+        ],
+        "resources": [
+          "dpuclusters"
+        ],
+        "resourceNames": [
+          "tenant-europe"
+        ],
+        "verbs": [
+          "get",
+          "list",
+          "watch"
+        ]
+      }
+    ]
+  },
+  {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "RoleBinding",
+    "metadata": {
+      "name": "dpf-install-checks-dpuclusters",
+      "namespace": "tenant-europe",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "Role",
+      "name": "dpf-install-checks-dpuclusters"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "dpf-install-checks",
+        "namespace": "dpf-operator-system"
+      }
+    ]
+  },
+  {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "name": "dpf-wait-tenants",
+      "namespace": "dpf-operator-system",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "75",
+        "argocd.argoproj.io/hook": "Sync",
+        "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation"
+      }
+    },
+    "spec": {
+      "backoffLimit": 0,
+      "activeDeadlineSeconds": 1300,
+      "template": {
+        "spec": {
+          "serviceAccountName": "dpf-install-checks",
+          "restartPolicy": "Never",
+          "tolerations": [
+            {
+              "key": "node-role.kubernetes.io/control-plane",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            },
+            {
+              "key": "node-role.kubernetes.io/master",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            }
+          ],
+          "containers": [
+            {
+              "name": "check",
+              "image": "clastix/kubectl:v1.34",
+              "command": [
+                "/bin/sh",
+                "-ec",
+                "kubectl wait -n tenant-europe dpucluster/tenant-europe --for=jsonpath='{.status.phase}'=Ready --timeout=600s\nkubectl wait -n tenant-asia dpucluster/tenant-asia --for=jsonpath='{.status.phase}'=Ready --timeout=600s\n"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "provisioning.dpu.nvidia.com/v1alpha1",
+    "kind": "DPUCluster",
+    "metadata": {
+      "name": "tenant-asia",
+      "namespace": "tenant-asia",
+      "labels": {
+        "training.dpf.nvidia.com/tenant": "asia"
+      },
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "spec": {
+      "clusterEndpoint": {
+        "keepalived": {
+          "interface": "oob0",
+          "nodeSelector": {
+            "node-role.kubernetes.io/control-plane": ""
+          },
+          "vip": "192.0.2.203",
+          "virtualRouterID": 127
+        }
+      },
+      "kubeconfig": "tenant-asia-admin-kubeconfig",
+      "maxNodes": 1000,
+      "type": "kamaji"
+    }
+  },
+  {
+    "apiVersion": "provisioning.dpu.nvidia.com/v1alpha1",
+    "kind": "DPUCluster",
+    "metadata": {
+      "name": "tenant-europe",
+      "namespace": "tenant-europe",
+      "labels": {
+        "training.dpf.nvidia.com/tenant": "europe"
+      },
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "70"
+      }
+    },
+    "spec": {
+      "clusterEndpoint": {
+        "keepalived": {
+          "interface": "oob0",
+          "nodeSelector": {
+            "node-role.kubernetes.io/control-plane": ""
+          },
+          "vip": "192.0.2.200",
+          "virtualRouterID": 126
+        }
+      },
+      "kubeconfig": "tenant-europe-admin-kubeconfig",
+      "maxNodes": 1000,
+      "type": "kamaji"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "name": "tenant-asia",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "-30"
+      }
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "name": "tenant-europe",
+      "annotations": {
+        "argocd.argoproj.io/sync-wave": "-30"
+      }
+    }
+  }
+]

@@ -1,0 +1,39 @@
+# ONE customer file: edit settings below, then kubectl apply -f config.yaml.
+# Install external Argo and the DPF platform first (README.md). No passwords here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {name: dpf-site, namespace: argocd}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/charts/site
+    helm:
+      valuesObject:
+        apiServerIP: 10.220.175.20  # please change here: existing Kubernetes API, port 6443
+        vipInterface: enp7s0       # please change here: management-node interface for tenant VIPs
+        europeVIP: 192.168.0.200   # please change here: reserved floating IP, outside DHCP
+        asiaVIP: 192.168.0.203     # please change here: reserved floating IP, outside DHCP
+        install-dhcp: "no"        # please change here: "yes" installs DHCP; arrange cutover first
+        dhcp:
+          nodeName: l-ae-1137d-001 # please change here: node connected to DPU management network
+          interface: enp7s0       # please change here: DHCP-facing interface on that node
+          serverIP: 192.168.0.129 # please change here: MUST be assigned to that node before enabling
+          subnet: 192.168.0.128   # please change here: DHCP network address
+          netmask: 255.255.255.128 # please change here: preserve existing lab /25
+          gateway: 192.168.0.254  # please change here: router offered to listed clients
+          # please change here: fill in management MACs before enabling DHCP; no lab MACs are published
+          reservations:
+          - {name: europe-dpu, mac: "", ip: 192.168.0.244}
+          - {name: asia-dpu, mac: "", ip: 192.168.0.242}
+          - {name: europe-bmc, mac: "", ip: 192.168.0.246}
+          - {name: asia-bmc, mac: "", ip: 192.168.0.249}
+          - {name: europe-idrac, mac: "", ip: 192.168.0.241}
+          - {name: asia-idrac, mac: "", ip: 192.168.0.243}
+          - {name: asia-host, mac: "", ip: 192.168.0.232, gateway: false, netmask: 255.255.255.0}
+  destination: {name: in-cluster, namespace: dpf-operator-system}
+  syncPolicy:
+    automated: {prune: false, selfHeal: false}
+    syncOptions: [ServerSideApply=true, ClientSideApplyMigration=false, FailOnSharedResource=true]
+    retry: {limit: 5, backoff: {duration: 10s, factor: 2, maxDuration: 3m}}

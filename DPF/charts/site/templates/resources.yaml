@@ -1,0 +1,22 @@
+{{- $site := .Values -}}
+{{- if or (eq $site.europeVIP $site.asiaVIP) (eq $site.apiServerIP $site.europeVIP) (eq $site.apiServerIP $site.asiaVIP) -}}
+{{- fail "apiServerIP, europeVIP and asiaVIP must be different addresses" -}}
+{{- end -}}
+{{- range $name := list "apiServerIP" "europeVIP" "asiaVIP" -}}
+{{- $first := int (first (splitList "." (index $site $name))) -}}
+{{- if or (eq $first 0) (eq $first 127) (ge $first 224) -}}
+{{- fail (printf "%s must be a unicast IPv4 address reachable from the DPUs" $name) -}}
+{{- end -}}
+{{- end -}}
+{{- range $obj := (.Files.Get "files/resources.json" | fromJsonArray) -}}
+{{- if eq $obj.kind "DPFOperatorConfig" -}}
+{{- $_ := set $obj.spec.overrides "kubernetesAPIServerVIP" $site.apiServerIP -}}
+{{- $_ := set $obj.spec.overrides "kubernetesAPIServerPort" $site.apiServerPort -}}
+{{- else if eq $obj.kind "DPUCluster" -}}
+{{- $vips := dict "tenant-europe" $site.europeVIP "tenant-asia" $site.asiaVIP -}}
+{{- $_ := set $obj.spec.clusterEndpoint.keepalived "vip" (required "Unknown tenant in site chart bundle" (get $vips $obj.metadata.name)) -}}
+{{- $_ := set $obj.spec.clusterEndpoint.keepalived "interface" $site.vipInterface -}}
+{{- end }}
+---
+{{ toYaml $obj }}
+{{ end -}}

@@ -1,0 +1,5 @@
+# Required site settings are supplied by DPF/config.yaml.
+# apiServerIP is an existing management Kubernetes API endpoint, not a new VIP.
+# Tenant VIPs are manually reserved addresses, outside DHCP allocation.
+apiServerPort: 6443
+install-dhcp: "no"

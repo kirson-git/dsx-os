@@ -44,8 +44,15 @@ Do not claim a local edit changes what Argo reads from Git.
 - External Argo runs in `argocd`; DPF service Argo runs in
   `dpf-operator-system`. Keep their installation IDs and watch scopes distinct.
 - Public Git sources use HTTPS. SSH URLs still require authentication.
-- Choose the single `DPF/install.yaml` Application **or** the five staged
-  Applications in `DPF/generated/applications/`. They own overlapping resources.
+- Recommended: `dpf-platform` plus `DPF/config.yaml` (`dpf-site`). Customers
+  edit only `config.yaml`; its Helm values configure operator/tenants and optional
+  DHCP. Do not combine it with `dpf-operator-config` or `dpf-tenants`.
+- Alternatives: the full-stack `DPF/install.yaml` Application **or** the five
+  staged Applications in `DPF/generated/applications/`. Ownership must not overlap.
+- Real lab MACs stay local; public MAC fields remain blank. DHCP defaults to
+  `install-dhcp: "no"`. Before enabling, follow `DPF/DHCP.md`, preserve all existing
+  clients, and transfer the server IP without concurrent responders. Corporate
+  DHCP for the management VMs is separate and must remain intact.
 - `operator.enabled: false` omits the renderer's legacy DPFOperatorConfig;
   it still installs the operator chart. The profile supplies configuration.
 - Configure API endpoints, tenant VIPs, BMC IPs/labels, serials, hardware
