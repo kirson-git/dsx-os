@@ -20,7 +20,7 @@ python3 -m unittest discover -s DPF/tests -v
 Tests require Helm, PyYAML and jsonschema. Rendering both same-cluster and
 separate-cluster modes is offline; no authentication or cluster writes occur.
 
-Preparation checks completed: 28 tests passed, 30 public profile custom resources
+Preparation checks completed: 29 tests passed, 30 public profile custom resources
 passed bundled CRD-schema validation, Application schemas validated, Markdown lint
 and local links passed, and the simple Helm recipe rendered with shared CRDs
 omitted. Chart checksums and the staged payload scan passed. A review found and
@@ -33,3 +33,7 @@ validation. The 12 new readiness/RBAC resources passed server-side dry-run. Bash
 credential tests cover hidden payload handling, cleanup, invalid input and rejecting
 repository-contained temporary directories, including symlinks. These checks do
 not execute a real install or validate real BMC authentication.
+
+A bootstrap regression check prevents waiting for overall DPF readiness before
+DPU provisioning. The gate uses the pinned controller's `SystemComponentsReconciled`
+condition instead. Full readiness remains a post-provisioning validation.

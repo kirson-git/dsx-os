@@ -91,7 +91,12 @@ DSX OS external-Argo adaptation, 2026-10-16:
 
 One-file/profile adaptation:
 - install.yaml combines platform and profile sources into one Application. Global
-  sync waves and scoped readiness Jobs gate operator readiness, tenant readiness
+  sync waves and scoped readiness Jobs gate operator reconciliation, tenant readiness
   and BMC Secret presence before hardware provisioning.
 - credentials.sh supplies the private shared BMC password via Bash; temporary
   files are private, outside the checkout, and removed after use.
+
+Bootstrap condition source:
+- DPF v26.4.0 sets SystemComponentsReconciled after applying system components;
+  overall Ready also summarizes component health and is a post-provisioning check.
+  https://github.com/NVIDIA/doca-platform/blob/v26.4.0/internal/operator/controllers/dpfoperatorconfig_controller.go

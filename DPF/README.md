@@ -70,10 +70,15 @@ release held node effects.
 
 Argo combines two sources: the rendered platform and the tenant/HBN profile.
 Resource waves order them within the same sync. Readiness Jobs wait for the DPF
-operator configuration and tenant APIs; a final gate checks that the BMC password
-Secret is present and nonempty before hardware resources are applied. That gate
-does not test BMC authentication. Failed gates stop later waves; fix the cause
-and retry sync in Argo. Pruning and self-heal are disabled.
+operator configuration reconciliation and tenant APIs; a final gate checks that
+the BMC password Secret is present and nonempty before hardware resources are
+applied. That gate does not test BMC authentication. Failed gates stop later
+waves; fix the cause and retry sync in Argo. Pruning and self-heal are disabled.
+
+The bootstrap gate checks `SystemComponentsReconciled`, not overall `Ready`.
+Overall readiness can depend on services running on provisioned DPUs, so waiting
+for it before provisioning would block a clean installation. Check full readiness
+after the DPUs have joined their tenant clusters.
 
 ```bash
 argocd app get dpf
@@ -145,6 +150,8 @@ See [provenance](SOURCES.txt) and the pinned
 On the management cluster:
 
 ```bash
+kubectl wait -n dpf-operator-system dpfoperatorconfig/dpfoperatorconfig \
+  --for=condition=Ready --timeout=600s
 kubectl get dpus -A
 kubectl get dpuclusters -A
 kubectl get dpuservices -n dpf-operator-system

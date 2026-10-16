@@ -28,6 +28,6 @@ spec:
         - /bin/sh
         - -ec
         - 'kubectl wait -n dpf-operator-system dpfoperatorconfig/dpfoperatorconfig
-          --for=condition=Ready --timeout=600s
+          --for=condition=SystemComponentsReconciled --timeout=600s
 
           '

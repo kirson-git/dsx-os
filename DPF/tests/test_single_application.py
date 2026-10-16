@@ -35,3 +35,9 @@ class SingleApplicationTests(unittest.TestCase):
         self.assertLess(wave(jobs['dpf-wait-tenants']),wave(jobs['dpf-check-bmc-secret']))
         self.assertLess(wave(jobs['dpf-check-bmc-secret']),min(map(wave,hardware)))
         for job in jobs.values():self.assertEqual(job['metadata']['annotations']['argocd.argoproj.io/hook'],'Sync')
+
+    def test_bootstrap_does_not_wait_for_unprovisioned_dpus(self):
+        job=yaml.safe_load((render.ROOT/'profiles/two-tenant-hbn/desired/10-operator-config/dpf-wait-operator.yaml').read_text())
+        script=job['spec']['template']['spec']['containers'][0]['command'][-1]
+        self.assertIn('--for=condition=SystemComponentsReconciled',script)
+        self.assertNotIn('--for=condition=Ready',script)
