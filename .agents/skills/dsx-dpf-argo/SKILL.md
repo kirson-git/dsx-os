@@ -41,6 +41,18 @@ Do not claim a local edit changes what Argo reads from Git.
 
 ## Ownership and credentials
 
+- For the prepared full lab reinstall, follow
+  [the two-command guide](../../../DPF/TWO-COMMAND-INSTALL.md). The private
+  multi-source `dpf` Application owns the four stages; never combine it with
+  the staged Applications. Its Git revision is pinned and its IPs/HBN patches
+  come from the reviewed private inputs. `config.yaml` alone still covers only
+  operator/tenants/DHCP; do not claim it contains all hardware settings.
+- Optional `bootstrap.hosts` uses DPF-native script Jobs for host reboot,
+  identity checks and a DPUNode journal to prevent repeated reset requests.
+  The combined unattended profile removes maintenance holds but preserves
+  `force: false` and `OnDelete`. It does not reboot for aggregate HBN status.
+  Keep host OS/DHCP/router/fabric dependencies in place. Never label a clean
+  rebuild proven from unit tests or schema dry-runs alone.
 - External Argo runs in `argocd`; DPF service Argo runs in
   `dpf-operator-system`. Keep their installation IDs and watch scopes distinct.
 - Public Git sources use HTTPS. SSH URLs still require authentication.

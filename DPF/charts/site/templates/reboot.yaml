@@ -1,0 +1,76 @@
+{{- $bootstrap := .Values.bootstrap | default dict -}}
+{{- $hosts := $bootstrap.hosts | default list -}}
+{{- if $hosts }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dpf-host-reboot-script
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+data:
+  host_reboot.py: |
+{{ .Files.Get "files/host_reboot.py" | indent 4 }}
+{{- end }}
+{{- $seen := dict -}}
+{{- $names := dict -}}
+{{- range $host := $hosts }}
+{{- if or (hasKey $seen $host.dpuNode) (hasKey $names $host.name) -}}
+{{- fail "bootstrap hosts must have unique names and DPUNode identities" -}}
+{{- end -}}
+{{- $_ := set $seen $host.dpuNode true -}}
+{{- $_ := set $names $host.name true }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dpf-reboot-{{ $host.name }}
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dpf-reboot-{{ $host.name }}
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+rules:
+- apiGroups: [provisioning.dpu.nvidia.com]
+  resources: [dpunodes]
+  resourceNames: [{{ $host.dpuNode | quote }}]
+  verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpf-reboot-{{ $host.name }}
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: dpf-reboot-{{ $host.name }}}
+subjects:
+- {kind: ServiceAccount, name: dpf-reboot-{{ $host.name }}, namespace: dpf-operator-system}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dpf-reboot-{{ $host.name }}
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+data:
+  pod-template: |
+{{ include "dpf.reboot.pod" (dict "host" $host "probe" false) | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dpf-probe-{{ $host.name }}-idrac
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "85"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+{{ include "dpf.reboot.pod" (dict "host" $host "probe" true) | indent 4 }}
+{{- end }}

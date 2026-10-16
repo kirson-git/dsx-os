@@ -1,5 +1,11 @@
 # Install DPF with Argo CD
 
+**Full lab reinstall:** [two commands: passwords, then one Application](TWO-COMMAND-INSTALL.md).
+This includes prerequisites, DPF, tenants, HBN and DPU provisioning using the
+prepared private lab settings. Use it after the agreed cleanup; keep external
+Argo, management Kubernetes, Ubuntu hosts, DHCP and fabric. The staged workflow
+below is an alternative, not an additional installation.
+
 **One file to edit: [config.yaml](config.yaml).** It contains the Kubernetes API,
 tenant VIPs, optional DHCP and MAC reservations. Argo reads the templates from
 Git. Passwords stay outside Git; the public file has blank MAC fields.

@@ -1,0 +1,115 @@
+{{- $bootstrap := .Values.bootstrap | default dict -}}
+{{- $hosts := $bootstrap.hosts | default list -}}
+{{- if $hosts }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+rules:
+- apiGroups: [provisioning.dpu.nvidia.com]
+  resources: [dpus]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: dpf-operator-system
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: dpf-bootstrap-ready}
+subjects:
+- {kind: ServiceAccount, name: dpf-bootstrap-ready, namespace: dpf-operator-system}
+{{- range $host := $hosts }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: tenant-{{ $host.name }}
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+rules:
+- apiGroups: [""]
+  resources: [secrets]
+  resourceNames: [tenant-{{ $host.name }}-admin-kubeconfig]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: tenant-{{ $host.name }}
+  annotations: {argocd.argoproj.io/sync-wave: "84"}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: dpf-bootstrap-ready}
+subjects:
+- {kind: ServiceAccount, name: dpf-bootstrap-ready, namespace: dpf-operator-system}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dpf-bootstrap-ready
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "95"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  template:
+    spec:
+      serviceAccountName: dpf-bootstrap-ready
+      nodeName: {{ (first $hosts).managementNode | quote }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      restartPolicy: Never
+      tolerations:
+      - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+      containers:
+      - name: check
+        image: clastix/kubectl:v1.34
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          umask 077
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          {{- range $host := $hosts }}
+          echo 'Waiting for {{ $host.name }} DPU to appear'
+          count=0
+          while :; do
+            dpu=$(kubectl --request-timeout=30s -n dpf-operator-system get dpus -l 'provisioning.dpu.nvidia.com/dpunode-name={{ $host.dpuNode }}' -o name)
+            [ -z "$dpu" ] || break
+            count=$((count + 1))
+            [ "$count" -lt 120 ] || { echo 'No DPU created for {{ $host.name }}'; exit 1; }
+            sleep 10
+          done
+          kubectl -n dpf-operator-system wait $dpu --for=condition=Ready --timeout=3600s
+          kubectl -n dpf-operator-system wait $dpu --for='jsonpath={.status.operationalConditions[?(@.type=="OperationalReady")].status}'=True --timeout=600s
+          kubectl --request-timeout=30s -n tenant-{{ $host.name }} get secret tenant-{{ $host.name }}-admin-kubeconfig -o 'jsonpath={.data.admin\.conf}' > "$work/encoded"
+          base64 -d < "$work/encoded" > "$work/kubeconfig"
+          [ -s "$work/kubeconfig" ] || { echo 'Tenant kubeconfig missing'; exit 1; }
+          kubectl --kubeconfig "$work/kubeconfig" wait nodes --all --for=condition=Ready --timeout=600s
+          count=0
+          while :; do
+            pods=$(kubectl --kubeconfig "$work/kubeconfig" --request-timeout=30s -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn -o name)
+            [ -z "$pods" ] || break
+            count=$((count + 1))
+            [ "$count" -lt 120 ] || { echo 'HBN pods not created'; exit 1; }
+            sleep 10
+          done
+          kubectl --kubeconfig "$work/kubeconfig" -n dpf-operator-system wait $pods --for=condition=Ready --timeout=600s
+          echo '{{ $host.name }}: DPU Ready/Operational, tenant node Ready and HBN pods Ready'
+          {{- end }}
+          echo 'Kubernetes readiness passed. Verify Ubuntu Internet traffic separately; no cross-tenant settings were changed.'
+{{- end }}

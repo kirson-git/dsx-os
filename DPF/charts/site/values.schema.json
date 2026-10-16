@@ -175,6 +175,62 @@
           }
         }
       }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hosts"
+      ],
+      "properties": {
+        "hosts": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "dpuNode",
+              "idracIP",
+              "serial",
+              "managementNode",
+              "verifyTLS"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "europe",
+                  "asia"
+                ]
+              },
+              "dpuNode": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+                "maxLength": 63
+              },
+              "idracIP": {
+                "type": "string",
+                "pattern": "^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$"
+              },
+              "serial": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]+$",
+                "maxLength": 64
+              },
+              "managementNode": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+                "maxLength": 63
+              },
+              "verifyTLS": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [
