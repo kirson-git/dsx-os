@@ -1,0 +1,32 @@
+# Optional overlapping pools; each is restricted to its tenant cluster.
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: asia-host-overlap
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '80'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: asia
+  ipv4Network:
+    network: 10.0.0.0/24
+    prefixSize: 24
+    gatewayIndex: 254
+---
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: europe-host-overlap
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '80'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  ipv4Network:
+    network: 10.0.0.0/24
+    prefixSize: 24
+    gatewayIndex: 254
