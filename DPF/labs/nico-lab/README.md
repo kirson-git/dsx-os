@@ -34,7 +34,7 @@ this staged setup with the single full-stack `dpf` Application.
 
 ```bash
 kubectl -n argocd patch application dpf-operator-config --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-operator-config -w
 ```
 
@@ -51,7 +51,7 @@ Press Ctrl+C to stop a watch; it does not stop the sync.
 
 ```bash
 kubectl -n argocd patch application dpf-tenants --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-tenants -w
 ```
 

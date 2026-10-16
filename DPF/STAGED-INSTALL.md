@@ -22,7 +22,8 @@ If you already cloned the repository, use that checkout.
 
 ## 1. Install external Argo with Helm
 
-Skip this step if external Argo CD is already installed.
+If external Argo CD is already installed, apply the
+[startup fix once](README.md#existing-argo--apply-the-startup-fix-once) instead.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -31,6 +32,8 @@ helm install external-argo-cd argo/argo-cd \
   --version 9.4.1 \
   --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
+  -f \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
   --wait --timeout 10m
 kubectl get pods -n argocd
 ```
@@ -87,7 +90,7 @@ Maintenance Operator, DPF operator and DPF service Argo CD.
 ```bash
 kubectl apply -f DPF/generated/applications/00-platform.yaml
 kubectl -n argocd patch application dpf-platform --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-platform \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```
@@ -103,7 +106,7 @@ For customized storage or a fork, use the local YAML command above.
 
 <!-- rumdl-disable MD013 -->
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml && kubectl -n argocd patch application dpf-platform --type merge -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml && kubectl -n argocd patch application dpf-platform --type merge -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 ```
 <!-- rumdl-enable MD013 -->
 
@@ -144,7 +147,7 @@ Sets the management API endpoint and enables DPF controllers.
 ```bash
 kubectl apply -f DPF/generated/applications/10-operator-config.yaml
 kubectl -n argocd patch application dpf-operator-config --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-operator-config \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```
@@ -162,7 +165,7 @@ Creates both tenant control planes and waits for their Kubernetes APIs.
 ```bash
 kubectl apply -f DPF/generated/applications/20-tenants.yaml
 kubectl -n argocd patch application dpf-tenants --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-tenants \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```
@@ -179,7 +182,7 @@ HBN runs on the DPUs after provisioning.
 ```bash
 kubectl apply -f DPF/generated/applications/30-hbn.yaml
 kubectl -n argocd patch application dpf-hbn --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-hbn \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```
@@ -197,7 +200,7 @@ fabric settings. The profile requires external reboot and node-effect handling;
 ```bash
 kubectl apply -f DPF/generated/applications/40-provisioning.yaml
 kubectl -n argocd patch application dpf-provisioning --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-provisioning \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```

@@ -13,3 +13,17 @@ configs:
   cm:
     installationID: dsx-platform
     application.resourceTrackingMethod: annotation
+    resource.customizations.health.apiextensions.k8s.io_CustomResourceDefinition: "local\
+      \ conditions = (obj.status or {}).conditions or {}\nif (obj.metadata or {}).deletionTimestamp\
+      \ ~= nil then\n  return {status = \"Progressing\", message = \"Waiting for CRD\
+      \ deletion\"}\nend\nfor _, condition in ipairs(conditions) do\n  if condition.type\
+      \ == \"Terminating\" and condition.status == \"True\" then\n    return {status\
+      \ = \"Progressing\", message = \"Waiting for CRD deletion\"}\n  end\nend\nfor\
+      \ _, condition in ipairs(conditions) do\n  if (condition.type == \"NamesAccepted\"\
+      \ and condition.status == \"False\") or\n     (condition.type == \"NonStructuralSchema\"\
+      \ and condition.status == \"True\") then\n    return {status = \"Degraded\"\
+      , message = condition.message or condition.reason or condition.type}\n  end\n\
+      end\nfor _, condition in ipairs(conditions) do\n  if condition.type == \"Established\"\
+      \ and condition.status == \"True\" then\n    return {status = \"Healthy\", message\
+      \ = \"CRD establishment complete\"}\n  end\nend\nreturn {status = \"Progressing\"\
+      , message = \"Waiting for CRD establishment\"}\n"

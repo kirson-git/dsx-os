@@ -71,7 +71,12 @@ phase accurately. Never infer DPU readiness from Argo Synced alone.
 
 Large CRDs need `ServerSideApply=true`. Argo 3.3.0 supports
 `ClientSideApplyMigration=false` to bypass client-side migration. A kubectl
-operation must carry its sync options; the short guide has the complete command.
+operation must carry both sync options and retry policy; direct kubectl patches
+do not copy `spec.syncPolicy.retry`. The short guide has the complete command.
+External Argo must load `DPF/values/external-argo.yaml`: its CRD health rule treats
+normal establishment as Progressing and preserves name/schema errors. Keep this
+Helm-owned setting outside the DPF Application. A failed operation does not resume
+automatically when the health setting changes.
 Do not solve annotation limits with force replacement or CRD deletion.
 
 A remaining StorageClass/provisioner is shared infrastructure until ownership

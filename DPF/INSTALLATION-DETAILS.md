@@ -21,6 +21,8 @@ helm install external-argo-cd argo/argo-cd \
   --version 9.4.1 \
   --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
+  -f \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
   --wait --timeout 10m
 ```
 
@@ -167,7 +169,7 @@ If the Argo CLI is not installed, request a platform sync through kubectl:
 
 ```bash
 kubectl -n argocd patch application dpf-platform --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-platform -w
 ```
 

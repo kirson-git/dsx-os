@@ -49,6 +49,8 @@ def argo_values(cfg):
             'params': {'application.namespaces': ext['namespace']},
             'cm': {'installationID': ext['installationID'], 'application.resourceTrackingMethod': 'annotation'}},
     }
+    startup = yaml.safe_load((render.ROOT / 'values/external-argo.yaml').read_text())
+    platform['configs']['cm'].update(startup['configs']['cm'])
     return platform, service
 
 

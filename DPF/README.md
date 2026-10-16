@@ -31,7 +31,8 @@ not reimage DPUs.
 ## Step 1 — External Argo CD and DPF platform
 
 Requires a working management Kubernetes cluster, Helm and kubectl.
-**Our lab already has external Argo CD: skip its Helm install.**
+**Our lab already has external Argo CD: skip its Helm install, but apply the
+[startup fix](#existing-argo--apply-the-startup-fix-once) once before syncing.**
 On a new cluster, install it first:
 
 ```bash
@@ -41,6 +42,8 @@ helm install external-argo-cd argo/argo-cd \
   --version 9.4.1 \
   --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
+  -f \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
   --wait --timeout 10m
 ```
 
@@ -51,12 +54,14 @@ storage**, suitable for our cleaned lab. To reuse existing storage, follow the
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml
 kubectl -n argocd patch application dpf-platform --type merge \
-  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-platform -w
 ```
 
-The sync waits for cert-manager’s API readiness check before creating dependent
-certificates. Start sync once; do not launch another while it is `Running`.
+The Argo settings wait for CRD establishment. The sync then waits for
+cert-manager’s API readiness check before creating dependent certificates.
+The command includes up to five automatic retries for transient failures.
+Start sync once; do not launch another while it is `Running`.
 Wait for `Synced` / `Healthy`, then press Ctrl+C. Before continuing, verify that
 this command prints `Succeeded`:
 
@@ -136,3 +141,48 @@ See [DHCP settings and NICo differences](DHCP.md).
 Create the private BMC Secret using the [credential guide](CREDENTIALS.md) before
 provisioning. [All separate steps](STAGED-INSTALL.md) ·
 [Production settings](PRODUCTION.md) · [Configuration details](CONFIGURATION.md)
+
+## Existing Argo — apply the startup fix once
+
+For the package's external Argo release on chart **9.4.1**, keep existing Helm
+settings and add the CRD readiness rule before the next DPF sync:
+
+```bash
+helm upgrade external-argo-cd argo/argo-cd \
+  --version 9.4.1 --namespace argocd --reuse-values \
+  -f \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
+  --wait --timeout 10m
+```
+
+This addresses Argo 3.3.0 reporting newly created CRDs as failed before
+`Established=True`. Name conflicts and invalid schemas still report errors.
+An already failed sync remains failed; after this upgrade, use the Step 1 sync
+command once to resume it. No DPF deletion is needed.
+
+## Reinstall external Argo CD
+
+Use this instead of the upgrade above if you want a fresh external Argo install.
+Wait until no Application sync is running. These commands replace only the Helm
+release in `argocd`; they preserve Application CRDs, Applications and DPF resources.
+Do not delete the `argocd` namespace or Argo CRDs.
+
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update argo
+helm uninstall external-argo-cd --namespace argocd --wait --timeout 5m
+helm install external-argo-cd argo/argo-cd \
+  --version 9.4.1 \
+  --namespace argocd --create-namespace \
+  --set configs.cm.installationID=dsx-platform \
+  -f \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
+  --wait --timeout 10m
+kubectl get pods -n argocd
+```
+
+This uses the package's default Argo settings. Custom ingress, SSO or other Helm
+settings must also be supplied when reinstalling. Argo is unavailable during the
+replacement; existing automated Applications can resume when it starts.
+Then return to the Step 1 sync command. Reinstalling Argo alone does not resume
+an already failed manual DPF sync.
