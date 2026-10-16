@@ -18,15 +18,6 @@ metadata:
     customer.dpf.nvidia.com/component: namespaces
 ---
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '-30'
-  labels:
-    customer.dpf.nvidia.com/component: namespaces
----
-apiVersion: v1
 kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
@@ -85,7 +76,7 @@ kind: CustomResourceDefinition
 metadata:
   name: challenges.acme.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -5764,7 +5755,7 @@ kind: CustomResourceDefinition
 metadata:
   name: orders.acme.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -6122,7 +6113,7 @@ kind: CustomResourceDefinition
 metadata:
   name: certificaterequests.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -6540,7 +6531,7 @@ kind: CustomResourceDefinition
 metadata:
   name: certificates.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -7678,7 +7669,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clusterissuers.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -14622,7 +14613,7 @@ kind: CustomResourceDefinition
 metadata:
   name: issuers.cert-manager.io
   annotations:
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app: cert-manager
@@ -23223,304 +23214,13 @@ webhooks:
       namespace: cert-manager
       path: /validate
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: local-path-provisioner
-  namespace: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-imagePullSecrets: null
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: local-path-config
-  namespace: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-data:
-  config.json: "{\n  \"nodePathMap\": [\n    {\n      \"node\": \"DEFAULT_PATH_FOR_NON_LISTED_NODES\"\
-    ,\n      \"paths\": [\n        \"/opt/local-path-provisioner\"\n      ]\n    }\n\
-    \  ]\n}"
-  setup: '#!/bin/sh
-
-    set -eu
-
-    mkdir -m 0777 -p "$VOL_DIR"'
-  teardown: '#!/bin/sh
-
-    set -eu
-
-    rm -rf "$VOL_DIR"'
-  helperPod.yaml: "apiVersion: v1\nkind: Pod\nmetadata:\n  name: helper-pod\n  namespace:\
-    \ local-path-provisioner\n  labels:\n    app.kubernetes.io/name: local-path-provisioner\n\
-    \    helm.sh/chart: local-path-provisioner-0.0.34\n    app.kubernetes.io/instance:\
-    \ local-path-provisioner\n    app.kubernetes.io/version: \"v0.0.34\"\n    app.kubernetes.io/managed-by:\
-    \ Helm\nspec:\n  priorityClassName: system-node-critical\n  tolerations:\n   \
-    \ - key: node.kubernetes.io/disk-pressure\n      operator: Exists\n      effect:\
-    \ NoSchedule\n  containers:\n    - name: helper-pod\n      image: busybox:latest\n\
-    \      imagePullPolicy: IfNotPresent\n      resources:\n        {}"
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: local-path
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    storageclass.kubernetes.io/is-default-class: 'false'
-    defaultVolumeType: hostPath
-    argocd.argoproj.io/sync-wave: '10'
-provisioner: cluster.local/local-path-provisioner
-volumeBindingMode: WaitForFirstConsumer
-reclaimPolicy: Delete
-allowVolumeExpansion: true
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-rules:
-- apiGroups:
-  - ''
-  resources:
-  - nodes
-  - configmaps
-  - pods
-  - pods/log
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ''
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - ''
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - patch
-  - update
-  - delete
-- apiGroups:
-  - ''
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclasses
-  verbs:
-  - get
-  - list
-  - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: local-path-provisioner
-subjects:
-- kind: ServiceAccount
-  name: local-path-provisioner
-  namespace: local-path-provisioner
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: local-path-provisioner
-  namespace: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-rules:
-- apiGroups:
-  - ''
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - patch
-  - update
-  - delete
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: local-path-provisioner
-  namespace: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: local-path-provisioner
-subjects:
-- kind: ServiceAccount
-  name: local-path-provisioner
-  namespace: local-path-provisioner
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: local-path-provisioner
-  namespace: local-path-provisioner
-  labels:
-    app.kubernetes.io/name: local-path-provisioner
-    helm.sh/chart: local-path-provisioner-0.0.34
-    app.kubernetes.io/instance: local-path-provisioner
-    app.kubernetes.io/version: v0.0.34
-    app.kubernetes.io/managed-by: Helm
-    customer.dpf.nvidia.com/component: local-path-provisioner
-  annotations:
-    argocd.argoproj.io/sync-wave: '10'
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: local-path-provisioner
-      app.kubernetes.io/instance: local-path-provisioner
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: local-path-provisioner
-        helm.sh/chart: local-path-provisioner-0.0.34
-        app.kubernetes.io/instance: local-path-provisioner
-        app.kubernetes.io/version: v0.0.34
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      serviceAccountName: local-path-provisioner
-      hostUsers: true
-      securityContext: {}
-      containers:
-      - name: local-path-provisioner
-        securityContext: {}
-        image: rancher/local-path-provisioner:v0.0.34
-        imagePullPolicy: IfNotPresent
-        command:
-        - local-path-provisioner
-        - --debug
-        - start
-        - --config
-        - /etc/config/config.json
-        - --service-account-name
-        - local-path-provisioner
-        - --provisioner-name
-        - cluster.local/local-path-provisioner
-        - --helper-image
-        - busybox:latest
-        - --configmap-name
-        - local-path-config
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/config/
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: CONFIG_MOUNT_PATH
-          value: /etc/config/
-        resources: {}
-      volumes:
-      - name: config-volume
-        configMap:
-          name: local-path-config
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: node-role.kubernetes.io/master
-                operator: Exists
-            - matchExpressions:
-              - key: node-role.kubernetes.io/control-plane
-                operator: Exists
-      tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/control-plane
-        operator: Exists
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: kamaji-system/kamaji-serving-cert
     controller-gen.kubebuilder.io/version: v0.16.1
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: datastores.kamaji.clastix.io
   labels:
@@ -23871,6 +23571,7 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: kamaji-system/kamaji-serving-cert
     controller-gen.kubebuilder.io/version: v0.16.1
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: tenantcontrolplanes.kamaji.clastix.io
   labels:
@@ -36336,6 +36037,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: nodefeatures.nfd.k8s-sigs.io
   labels:
@@ -36473,6 +36175,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: nodefeaturegroups.nfd.k8s-sigs.io
   labels:
@@ -36864,6 +36567,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: nodefeaturerules.nfd.k8s-sigs.io
   labels:
@@ -37937,6 +37641,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: maintenanceoperatorconfigs.maintenance.nvidia.com
   labels:
@@ -38059,6 +37764,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   name: nodemaintenances.maintenance.nvidia.com
   labels:
@@ -46843,7 +46549,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -47140,7 +46846,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -47372,7 +47078,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -49599,7 +49305,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -49862,7 +49568,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -50610,7 +50316,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -50950,7 +50656,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -51081,7 +50787,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -51375,7 +51081,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -51636,7 +51342,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -51875,7 +51581,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -52672,7 +52378,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -53141,7 +52847,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -53574,7 +53280,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -53869,7 +53575,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -54442,7 +54148,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -54984,7 +54690,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -55282,7 +54988,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -55991,7 +55697,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -56223,7 +55929,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -56749,7 +56455,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -56923,7 +56629,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -57111,7 +56817,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -57403,7 +57109,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -57652,7 +57358,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -58016,7 +57722,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -58267,7 +57973,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -58345,6 +58051,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+    argocd.argoproj.io/sync-options: ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -58581,7 +58288,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -58806,7 +58513,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -59129,7 +58836,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager
@@ -59456,7 +59163,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false,ServerSideApply=true
     argocd.argoproj.io/sync-wave: '-20'
   labels:
     app.kubernetes.io/part-of: dpf-operator-controller-manager

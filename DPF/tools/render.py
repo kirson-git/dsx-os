@@ -141,6 +141,10 @@ def prepare_object(original,component,wave):
     for key in list(ann):
         if key.startswith('helm.sh/hook'):del ann[key]
     if ann.pop('helm.sh/resource-policy',None)=='keep':ann[ANN+'sync-options']='Delete=false,Prune=false'
+    if kind=='CustomResourceDefinition':
+        options=ann.get(ANN+'sync-options','').split(',') if ann.get(ANN+'sync-options') else []
+        options.append('ServerSideApply=true')
+        ann[ANN+'sync-options']=','.join(options)
     ann[ANN+'sync-wave']=str(wave)
     meta.setdefault('labels',{})['customer.dpf.nvidia.com/component']=component
     if component=='kamaji' and kind=='Job' and name=='kamaji-etcd-setup-1':
@@ -183,7 +187,7 @@ def application(cfg):
         'path':cfg['git']['path'],'directory':{'recurse':False,'include':'*.yaml'}},
         'destination':{'server':'https://kubernetes.default.svc','namespace':NS},
         'syncPolicy':{'automated':{'prune':False,'selfHeal':True},
-          'syncOptions':['ServerSideApply=true','FailOnSharedResource=true'],
+          'syncOptions':['ServerSideApply=true','ClientSideApplyMigration=false','FailOnSharedResource=true'],
           'retry':{'limit':5,'backoff':{'duration':'10s','factor':2,'maxDuration':'3m'}}}}}
 
 def run(command):

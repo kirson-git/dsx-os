@@ -43,6 +43,28 @@ use the public HTTPS repository without Git credentials. Private forks need
 [Git credentials](CREDENTIALS.md).
 Do not expand external Argo's Application watch scope to `dpf-operator-system`.
 
+### Reuse existing storage
+
+The published platform reuses StorageClass `local-path` and does not install a
+storage provisioner. Before syncing, check that the class exists and its
+provisioner is healthy:
+
+```bash
+kubectl get storageclass
+kubectl get deployments,pods -A | grep local-path
+```
+
+If your cluster has another working StorageClass, set `storage.className` in
+`DPF/site.yaml`. Only for a lab without a provisioner, set
+`storage.installLocalPath: true` and `storage.className: local-path`.
+[Regenerate and commit the manifests](#maintainer-option-re-render-after-changing-chart-settings) before syncing.
+The offline renderer does not detect cluster storage automatically. Never replace
+an existing StorageClass's immutable provisioner field.
+
+Applications use server-side apply with `ClientSideApplyMigration=false`.
+CRDs also carry `ServerSideApply=true` individually, avoiding oversized
+`last-applied-configuration` annotations when syncing through kubectl.
+
 ## 2. Set the DPU BMC IP and create the password Secret
 
 ```bash
@@ -141,6 +163,18 @@ kubectl apply -f DPF/generated/applications/40-provisioning.yaml
 argocd app sync dpf-provisioning
 ```
 
+If the Argo CLI is not installed, request a platform sync through kubectl:
+
+```bash
+kubectl -n argocd patch application dpf-platform --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-platform -w
+```
+
+Include the sync options in the operation: a kubectl operation does not inherit
+all options from `spec.syncPolicy`. Wait for the operation to succeed and the
+Application to become Synced/Healthy before proceeding.
+
 The `argocd app sync` commands wait for their sync operation by default. Proceed
 after each succeeds. Provisioning can reimage DPUs; run that last sync in the
 intended maintenance window. These Applications use manual sync and no pruning.
@@ -230,8 +264,10 @@ Edit `DPF/site.yaml`:
 - `git.repoURL`, `git.revision`, `git.path`: your reviewed Git source. Pin a commit
   for deployment; branch `main` is only the example default.
 - `kubernetesVersion`: actual management cluster version used for Helm rendering.
-- `storage.installLocalPath` and `storage.className`: lab provisioning or existing
-  production StorageClass.
+- `storage.installLocalPath`: defaults to `false`, reusing existing storage.
+  Set `true` only to install the optional lab provisioner on a cluster without one.
+- `storage.className`: defaults to `local-path`; must name a working StorageClass
+  when reusing storage.
 - `externalArgo.namespace`: external controller namespace; default `argocd`.
 - `externalArgo.sameCluster`: true for a separate installation on this management
   cluster; false when the external controller runs on another cluster.

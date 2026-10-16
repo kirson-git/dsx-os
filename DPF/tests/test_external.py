@@ -14,6 +14,12 @@ class ExternalTests(unittest.TestCase):
     def test_renderer_exists(self):
         self.assertIsNotNone(external, 'External-Argo renderer is required')
 
+    def test_default_reuses_storage_and_disables_csa_migration(self):
+        cfg=yaml.safe_load((render.ROOT/'site.yaml').read_text())
+        self.assertFalse(cfg['storage']['installLocalPath'])
+        for app in [external.application(cfg,'dpf-platform',cfg['git']['path']), external.single_application(cfg)]:
+            self.assertIn('ClientSideApplyMigration=false',app['spec']['syncPolicy']['syncOptions'])
+
     @unittest.skipIf(external is None, 'Renderer not implemented')
     def test_two_controllers_are_isolated(self):
         cfg=yaml.safe_load((render.ROOT/'site.yaml').read_text())
@@ -50,6 +56,7 @@ class ExternalTests(unittest.TestCase):
                 self.assertEqual(entry['spec']['destination']['name'],cfg['externalArgo']['destinationName'])
                 argo=[o for o in objects if o['kind']=='CustomResourceDefinition' and o['metadata']['name'].endswith('.argoproj.io')]
                 self.assertEqual(len(argo),0 if same else 3)
+                self.assertFalse(any(o['kind']=='StorageClass' or o['metadata'].get('labels',{}).get('customer.dpf.nvidia.com/component')=='local-path-provisioner' for o in objects))
                 keys=[(o['apiVersion'],o['kind'],o['metadata'].get('namespace',''),o['metadata']['name']) for o in objects]
                 self.assertEqual(len(keys),len(set(keys)))
                 for obj in objects:

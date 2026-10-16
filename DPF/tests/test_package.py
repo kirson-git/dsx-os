@@ -56,6 +56,14 @@ class PackageTests(unittest.TestCase):
             obj={'kind':kind,'metadata':{'name':'default'}}
             out=render.prepare_object(obj,'kamaji',30)
             self.assertEqual(out['metadata']['annotations']['argocd.argoproj.io/sync-wave'],wave)
+    def test_crds_use_ssa_even_for_kubectl_triggered_syncs(self):
+        obj={'kind':'CustomResourceDefinition','metadata':{'name':'large.example.com',
+             'annotations':{'helm.sh/resource-policy':'keep'}}}
+        out=render.prepare_object(obj,'test',0)
+        options=out['metadata']['annotations']['argocd.argoproj.io/sync-options'].split(',')
+        for option in ['ServerSideApply=true','Delete=false','Prune=false']:
+            self.assertIn(option,options)
+
     def test_secret_material_is_rejected(self):
         for obj in [{'kind':'Secret','metadata':{'name':'oops'},'data':{'password':'eA=='}},
                     {'kind':'Secret','metadata':{'name':'oops'},'stringData':{'password':'x'}}]:
