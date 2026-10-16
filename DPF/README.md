@@ -31,29 +31,52 @@ is not required. Configure Argo access, authenticate your CLI or use its UI, and
 supply private Git access as described in [credentials](CREDENTIALS.md).
 Do not expand external Argo's Application watch scope to `dpf-operator-system`.
 
-## 2. Configure IPs and credentials
+## 2. Set the DPU BMC IP and create the password Secret
 
 ```bash
 git clone git@github.com:kirson-git/dsx-os.git
 cd dsx-os
 ```
 
-Follow [IP and password settings](CONFIGURATION.md). Replace the illustrative
-addresses, identities and selectors in the profile, then commit and push your
-reviewed configuration. Set the repository/revision in the chosen Application
-YAML(s) if using your own fork. Argo reads Git, not uncommitted local files.
+**DPU IP: edit YAML. Password: run Bash. Never commit the password.**
 
-On the DPF management cluster, prepare the private BMC password before either
-full-stack installation option. On a clean cluster:
+### DPU BMC IP
+
+Edit these files under `DPF/profiles/two-tenant-hbn/desired/40-provisioning/`:
+
+| DPU | YAML to edit |
+| --- | --- |
+| Europe | `dpudevice-example-europe.yaml` |
+| Asia | `dpudevice-example-asia.yaml` |
+
+Set `spec.bmcIp` to the DPU's **BMC/Redfish address**, not its Ubuntu SSH address.
+Set the `provisioning.dpu.nvidia.com/dpudevice-bmc-ip` label to the same address.
+Keep the matching BMC-IP selector in `dpuset-hbn-europe.yaml` or
+`dpudeployment-hbn-asia.yaml` consistent with it.
+
+### BMC password
+
+On a clean DPF management cluster, create the namespace and run the helper:
 
 ```bash
 kubectl create namespace dpf-operator-system
 bash DPF/credentials.sh
 ```
 
-The script prompts without echo and stores only a Kubernetes Secret. If the
-namespace already exists, omit the create command. Password files and production
-secret-manager options are covered in [CREDENTIALS.md](CREDENTIALS.md).
+Skip namespace creation if it already exists. Type the shared **BMC password**
+at the hidden prompt. The helper creates Kubernetes Secret
+`dpf-operator-system/bmc-shared-password`; it does not change a Linux login.
+No password YAML is needed. See [private-file input](CREDENTIALS.md) if preferred.
+
+**Site prerequisite:** changing only the BMC IP and password is sufficient only
+when the rest of the profile already matches your site. The clean Git examples
+also contain placeholder management API addresses, tenant VIPs, hardware serials
+and network settings. Replace those using [CONFIGURATION.md](CONFIGURATION.md)
+before the first deployment; they are not discovered by the password script.
+
+Commit and push the non-secret YAML changes. Argo reads Git, not local edits.
+If using a fork, update the repository/revision in the chosen Application YAML.
+Private repositories also need [Argo Git access](CREDENTIALS.md).
 
 ## Option A: one YAML for the complete stack
 
