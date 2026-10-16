@@ -26,6 +26,30 @@ These are the inherited DPF 26.4.0 package pins. Do not infer that other Argo or
 Kubernetes versions are compatible without testing. See [provenance](SOURCES.txt)
 and NVIDIA's [prerequisites](https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites).
 
+## Starting point: clean Kubernetes cluster
+
+This guide starts after the previous installation has been removed, including
+its Argo, DPF and prerequisite CRDs. Kubernetes itself must be operational, with
+working networking and schedulable nodes. Cleanup is a separate operation; the
+commands below install the stack and do not delete the previous installation.
+
+Install external Argo first. It creates the Argo CRDs on this clean cluster.
+Then deploy these five Application YAMLs in order, syncing each at its documented
+stage. Each Application points to the underlying manifests in Git.
+
+| File under `DPF/generated/applications/` | Purpose |
+| --- | --- |
+| `00-platform.yaml` | Prerequisites, DPF operator and DPF service Argo |
+| `10-operator-config.yaml` | Site-specific DPF configuration |
+| `20-tenants.yaml` | Europe and Asia tenant control planes |
+| `30-hbn.yaml` | HBN interfaces, IPAM, services and networking definitions |
+| `40-provisioning.yaml` | Inventory, BFB/flavors and DPU provisioning |
+
+The package includes all five Application YAMLs and their referenced manifests.
+The public profile uses illustrative addresses and hardware identities: replace
+these with your reviewed site settings and supply credentials privately before
+syncing the profile. A complete clean rebuild has not yet been qualified.
+
 ## 1. Install external Argo with Helm
 
 Select the intended external-Argo cluster in your current kubectl configuration
@@ -45,10 +69,20 @@ helm install external-argo-cd argo/argo-cd \
   --wait --timeout 10m
 ```
 
-On a cluster that already has Argo CRDs (including the existing DPF lab), add
-`--set crds.install=false` to the Helm install command. This reuses the shared
-CRDs; preserve their existing owner and do not delete them during DPF cleanup.
-Check schema compatibility before reusing a different Argo version.
+Do **not** add `--set crds.install=false` for this clean-cluster installation:
+Helm must create the Argo CRDs. `installationID=dsx-platform` identifies the
+external controller when DPF's separate service Argo is installed later.
+
+Check that the CRDs are established and inspect the Argo pods:
+
+```bash
+kubectl wait --for=condition=Established --timeout=60s \
+  crd/applications.argoproj.io \
+  crd/applicationsets.argoproj.io \
+  crd/appprojects.argoproj.io
+kubectl get pods -n argocd
+```
+
 The new controller watches its own namespace by default. Do not configure it
 to watch the DPF service Application namespace.
 
@@ -88,10 +122,8 @@ NFD, Maintenance Operator, DPF operator and the separate service Argo. Resource
 waves order their installation. Kamaji setup hooks create runtime certificates;
 no certificate or password data is committed here.
 
-On a fresh shared cluster, external Argo's Helm bootstrap owns Argo CRDs and
-the service chart omits them. When reusing existing CRDs, keep their existing
-owner until a deliberate ownership migration is performed. On separate
-clusters, the service chart
+On this fresh shared cluster, external Argo's Helm bootstrap owns Argo CRDs
+and the service chart omits them. On separate clusters, the service chart
 includes CRDs on the DPF cluster. The controllers have distinct installation IDs
 and watch their own Application namespaces. See
 [resource tracking](https://argo-cd.readthedocs.io/en/stable/user-guide/resource_tracking/).

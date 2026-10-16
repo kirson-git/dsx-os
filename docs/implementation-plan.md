@@ -1,7 +1,7 @@
 # External Argo DPF recovery package implementation plan
 
-> Execute inline with superpowers:executing-plans. No live deletion is authorized
-> until the user's teardown boundary and external controller location are resolved.
+> Execute inline with superpowers:executing-plans. The installation guide targets
+> a clean Kubernetes cluster; live teardown and rebuild remain separate tasks.
 
 **Goal:** Install prerequisites and DPF with external Argo, reproduce the two-tenant
 HBN setup, and document customer production changes without publishing credentials.
@@ -32,8 +32,9 @@ and provenance are in ../DPF/SOURCES.txt.
 - [x] Include sanitized Europe/Asia profile, host networking and fabric contract.
 - [x] Document bootstrap, dependency ordering, verification and production inputs.
 - [x] Render both topology variants; validate CRDs and resource uniqueness.
-- [ ] Scan the complete proposed Git payload and publish to kirson-git/dsx-os.
-- [ ] Resolve cleanup boundary and controller location with user.
+- [x] Scan the complete proposed Git payload and publish to kirson-git/dsx-os.
+- [x] Record the clean-cluster starting point, including removal of old CRDs.
+- [ ] Finalize the exact live deletion inventory before teardown.
 - [ ] Complete private recovery including credentials, tenant data and fabric state.
 - [ ] Preview exact teardown, then perform the agreed teardown with command logs.
 - [ ] Rebuild from external Argo and repeat both-tenant data-path acceptance checks.
@@ -44,3 +45,7 @@ remain pending until performed, including reboot persistence and isolation tests
 User clarification: Argo installation uses standard Helm commands, followed by
 Application YAMLs. No custom bootstrap wrapper ships. Passwords are external,
 with a private-input BMC helper and documented external-secret-manager option.
+
+Clean-cluster clarification: bootstrap Helm installs fresh Argo CRDs. The external
+installation retains its distinct installation ID; the later service Argo omits
+shared CRDs. The guide lists all five Application YAMLs and their sync order.

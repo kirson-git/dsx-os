@@ -1,9 +1,10 @@
 # Teardown and recovery boundary
 
 Objective: remove the agreed DPF stack, bootstrap external Argo, and restore the
-standalone two-tenant HBN outcome. The exact live teardown boundary and controller
-placement must be confirmed for each environment. No cleanup has been run by
-publishing this package.
+standalone two-tenant HBN outcome. The installation guide assumes a clean
+Kubernetes cluster after removal of the previous stack and its CRDs. No cleanup
+has been run by publishing this package; Kubernetes must remain operational or
+be rebuilt separately before following the installation steps.
 
 ## Before deleting
 
@@ -35,9 +36,10 @@ resources are also not Helm releases: do not expect `helm uninstall` to remove
 Argo-applied workloads. Produce the exact environment-specific deletion list from
 owned resources and review storage/hardware consequences before executing it.
 
-Shared cert-manager, storage, NFD or Argo CRDs must not be deleted because they
-appear in a DPF list. An existing deployment is an ownership migration, not a
-fresh install; manual sync and FailOnSharedResource do not detect every Helm-owned
+For a partial teardown, shared cert-manager, storage, NFD or Argo CRDs must not
+be deleted merely because they appear in a DPF list. An existing deployment is
+an ownership migration, not a fresh install; manual sync and FailOnSharedResource
+do not detect every Helm-owned
 or untracked resource. Do not apply this package over the working stack blindly.
 
 ## Return to the saved outcome
@@ -51,3 +53,13 @@ compare with the private pre-teardown evidence.
 Keep a recovery path until reboot persistence, data-path checks and the intended
 isolation checks pass. A successful manifest dry-run or Argo Synced status alone
 does not establish this outcome.
+
+## Argo CRDs after a full reset
+
+For the agreed clean-cluster path, the previous Argo CRDs are gone. Install
+external Argo with CRD installation enabled (the chart default), exactly as in
+the main README. The later DPF service Argo reuses these newly installed CRDs.
+
+Reusing existing Argo CRDs is a different migration path: it can require
+`--set crds.install=false`, schema compatibility checks and preserving their
+owner. That flag is not part of the clean-cluster installation command.
