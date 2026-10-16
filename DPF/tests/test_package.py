@@ -87,6 +87,13 @@ class RenderedChartTests(unittest.TestCase):
         cls.objects=render.render(cls.cfg,pathlib.Path(cls.temp.name)/'rendered')
     @classmethod
     def tearDownClass(cls):cls.temp.cleanup()
+    def test_storage_controller_matches_standard_existing_class(self):
+        storage=next(o for o in self.objects if o['kind']=='StorageClass')
+        controller=next(o for o in self.objects if o['kind']=='Deployment' and o['metadata']['name']=='local-path-provisioner')
+        command=controller['spec']['template']['spec']['containers'][0]['command']
+        self.assertEqual(storage['provisioner'],'rancher.io/local-path')
+        self.assertEqual(command[command.index('--provisioner-name')+1],storage['provisioner'])
+
     def test_custom_objects_match_bundled_crd_schemas(self):
         import jsonschema
         schemas={}

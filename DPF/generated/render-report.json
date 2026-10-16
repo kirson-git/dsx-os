@@ -8,7 +8,7 @@
     "argoNamespace": "dpf-operator-system",
     "kubernetesVersion": "1.34.0",
     "storage": {
-      "installLocalPath": false,
+      "installLocalPath": true,
       "className": "local-path"
     },
     "operator": {
@@ -44,7 +44,7 @@
       "serviceInstallationID": "dsx-dpf-services"
     }
   },
-  "resources": 188,
-  "platformSHA256": "009864de7ad08e877e5ad376c8f2233d6d0b0691edde1fa29ca8cff2b5ec6650",
+  "resources": 197,
+  "platformSHA256": "cf28a9540b25c25ff5e640ae7dd9c3e5ab5b52e9e6a1134b421e4e065465e5eb",
   "validation": "Offline render only; no live install, migration, cleanup or DPU provisioning performed."
 }

@@ -30,8 +30,11 @@ Kamaji and its datastore available until tenant cleanup is complete. Remove DPF
 configuration/operator and dedicated prerequisites only after dependent resources
 are gone. Do not strip finalizers to make a failed cleanup appear successful.
 
-Argo Application deletion is non-cascading in these templates. Removing an
-Application therefore does not uninstall the resources it managed. Chart-rendered
+The shipped Application templates omit resource-deletion finalizers. Deleting
+only the Application without cascading leaves its managed resources. The Argo UI
+can request cascading deletion and add a finalizer; inspect that choice and live
+finalizers before deleting. Cascading namespace deletion also removes its PVCs.
+Chart-rendered
 resources are also not Helm releases: do not expect `helm uninstall` to remove
 Argo-applied workloads. Produce the exact environment-specific deletion list from
 owned resources and review storage/hardware consequences before executing it.

@@ -6,7 +6,7 @@ git:
 argoNamespace: dpf-operator-system
 kubernetesVersion: 1.34.0
 storage:
-  installLocalPath: false
+  installLocalPath: true
   className: local-path
 operator:
   enabled: false

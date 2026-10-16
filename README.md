@@ -52,9 +52,9 @@ kubectl get pods -n argocd
 
 ## Step 2: configure and deploy DPF
 
-Follow the [DPF guide](DPF/README.md#2-set-the-dpu-bmc-ip-and-create-the-password-secret)
-to configure your site and create the private BMC password Secret with
-`bash DPF/credentials.sh`. This public repository uses HTTPS, so Argo needs no
+Follow the [DPF guide](DPF/README.md) in order. For the one-YAML option,
+[prepare the namespace, site settings and password first](DPF/INSTALLATION-DETAILS.md#2-set-the-dpu-bmc-ip-and-create-the-password-secret).
+This public repository uses HTTPS, so Argo needs no
 Git credentials. For a private fork, configure
 [private Git access](DPF/CREDENTIALS.md).
 
@@ -66,8 +66,8 @@ Git credentials. For a private fork, configure
 **Choose one option per installation.** Both manage the same resources, so do
 not apply both. Provisioning can reimage DPUs once real hardware is configured.
 
-See the [one-YAML command](DPF/README.md#option-a-one-yaml-for-the-complete-stack)
-or the [step-by-step commands](DPF/README.md#option-b-separate-yamls-for-control-of-each-stage).
+See the [one-YAML command](DPF/INSTALLATION-DETAILS.md#option-a-one-yaml-for-the-complete-stack)
+or the [step-by-step commands](DPF/INSTALLATION-DETAILS.md#option-b-separate-yamls-for-control-of-each-stage).
 No custom installation wrapper is required.
 
 Start with the [DPF installation guide](DPF/README.md), then review
@@ -90,3 +90,15 @@ charts, renderer, tests and guides are tracked in this repository.
 Passwords, private keys, kubeconfigs, runtime Secrets and recovery backups stay
 outside Git. Container images and BFB downloads are external artifacts referenced
 by the manifests; they are not bundled in this repository.
+
+## Storage choice
+
+| Install storage | Setting in `DPF/site.yaml` |
+| --- | --- |
+| Enabled: install a provisioner for a fresh lab | `storage.installLocalPath: true` |
+| Disabled: reuse healthy existing storage | `storage.installLocalPath: false` |
+
+[Apply your choice](DPF/README.md#2-choose-storage) by regenerating and pushing
+manifests before syncing. Argo does not auto-detect an existing provisioner.
+
+For LLM assistants, load the [DPF Argo skill](.agents/skills/dsx-dpf-argo/SKILL.md).

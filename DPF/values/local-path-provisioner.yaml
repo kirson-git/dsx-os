@@ -1,3 +1,5 @@
+storageClass:
+  provisionerName: rancher.io/local-path
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:

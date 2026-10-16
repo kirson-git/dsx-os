@@ -14,9 +14,8 @@ class ExternalTests(unittest.TestCase):
     def test_renderer_exists(self):
         self.assertIsNotNone(external, 'External-Argo renderer is required')
 
-    def test_default_reuses_storage_and_disables_csa_migration(self):
+    def test_applications_disable_csa_migration(self):
         cfg=yaml.safe_load((render.ROOT/'site.yaml').read_text())
-        self.assertFalse(cfg['storage']['installLocalPath'])
         for app in [external.application(cfg,'dpf-platform',cfg['git']['path']), external.single_application(cfg)]:
             self.assertIn('ClientSideApplyMigration=false',app['spec']['syncPolicy']['syncOptions'])
 
@@ -48,6 +47,7 @@ class ExternalTests(unittest.TestCase):
         cfg=yaml.safe_load((render.ROOT/'site.yaml').read_text())
         for same in [True,False]:
             with self.subTest(same_cluster=same),tempfile.TemporaryDirectory() as tmp:
+                cfg['storage']['installLocalPath']=False
                 cfg['externalArgo']['sameCluster']=same
                 cfg['externalArgo']['destinationName']='in-cluster' if same else 'dpf-management'
                 objects=external.generate(cfg,pathlib.Path(tmp)/'generated')
