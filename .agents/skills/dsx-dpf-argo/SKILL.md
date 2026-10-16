@@ -1,6 +1,6 @@
 ---
 name: dsx-dpf-argo
-description: Use when assisting with standalone DPF installation, storage selection, Argo CD sync failures, or site configuration in the dsx-os repository. Covers the customer GitOps package; NICo integration is planned separately.
+description: Use when assisting with standalone DPF installation, storage selection, Argo CD sync failures, site configuration, or HBN tenant-network changes in the dsx-os repository. Covers the customer GitOps package; NICo integration is planned separately.
 ---
 
 # DSX DPF Argo installation
@@ -91,6 +91,14 @@ installation. Follow [RECOVERY.md](../../../DPF/RECOVERY.md).
 Stop retrying when the same error persists; gather the missing evidence and
 report the specific blocker. This skill adds no permission for teardown or
 hardware reprovisioning. Keep build machines out of cluster administration.
+
+## HBN tenant-network changes
+
+For a subnet migration, read [the HBN migration procedure](references/hbn-migration.md).
+It covers separate routing/connection tracking for overlapping CIDRs, authoritative
+Argo sources, staged host netplan, DPUDeployment maintenance holds, and validation.
+Do not infer that an HBN-only subnet change requires a DPU reboot or BFB reinstall.
+Keep credentials and real lab MACs out of public skill examples and Git.
 
 ## Verify and communicate
 
