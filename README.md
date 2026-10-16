@@ -52,6 +52,18 @@ kubectl get pods -n argocd
 
 ## Step 2: configure and deploy DPF
 
+For the staged fresh-lab install, after external Argo is ready, apply and sync
+prerequisites + DPF operator in one line. Storage installation is enabled:
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml && kubectl -n argocd patch application dpf-platform --type merge -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+```
+<!-- rumdl-enable MD013 -->
+
+For existing storage or a fork, [configure and render your own manifests first](DPF/README.md#2-choose-storage).
+This starts the platform stage; tenant configuration and provisioning follow.
+
 Follow the [DPF guide](DPF/README.md) in order. For the one-YAML option,
 [prepare the namespace, site settings and password first](DPF/INSTALLATION-DETAILS.md#2-set-the-dpu-bmc-ip-and-create-the-password-secret).
 This public repository uses HTTPS, so Argo needs no

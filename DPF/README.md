@@ -57,6 +57,16 @@ kubectl -n argocd patch application dpf-platform --type merge \
 kubectl -n argocd get application dpf-platform -w
 ```
 
+Or apply and start sync with one line (same fresh-lab defaults, storage enabled):
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml && kubectl -n argocd patch application dpf-platform --type merge -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+```
+<!-- rumdl-enable MD013 -->
+
+This starts the platform stage; wait for **Synced / Healthy** before continuing.
+
 If you customized storage or use a fork, replace the first command with
 `kubectl apply -f DPF/generated/applications/00-platform.yaml` from your reviewed
 checkout. Its repository URL/revision must point to your pushed changes.
