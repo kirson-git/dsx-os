@@ -1,12 +1,24 @@
 # Install DPF with Argo CD
 
-Use a working Kubernetes cluster with Helm and kubectl access. This example uses
-DPF 26.4.0; NICo integration is planned separately. Clean rebuild qualification
-is still in progress.
+Follow these steps in order, in the same terminal. You need Git, Helm, kubectl
+and access to a working Kubernetes cluster. This installs standalone DPF 26.4.0.
+
+## Before you start
+
+If you cannot push to this repository, fork it on GitHub and replace the clone
+URL below with your fork's HTTPS URL.
+
+```bash
+git clone https://github.com/kirson-git/dsx-os.git
+cd dsx-os
+kubectl config current-context
+```
+
+If you already cloned the repository, use that checkout.
 
 ## 1. Install external Argo with Helm
 
-Skip this step if you already installed external Argo CD.
+Skip this step if external Argo CD is already installed.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -16,23 +28,22 @@ helm install external-argo-cd argo/argo-cd \
   --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
   --wait --timeout 10m
+kubectl get pods -n argocd
 ```
 
 ## 2. Choose storage
-
-| Your cluster | `storage.installLocalPath` | Result |
-| --- | --- | --- |
-| No storage provisioner | `true` — enabled | Install Local Path (fresh lab default) |
-| Healthy existing storage | `false` — disabled | Reuse `storage.className` |
-
-Check **both** the StorageClass and its running provisioner:
 
 ```bash
 kubectl get storageclass
 kubectl get deployments,pods -A | grep local-path
 ```
 
-The choice is in [site.yaml](site.yaml):
+Edit [DPF/site.yaml](site.yaml):
+
+| Your cluster | `storage.installLocalPath` |
+| --- | --- |
+| No storage provisioner | `true` — install Local Path |
+| Healthy existing provisioner | `false` — reuse `storage.className` |
 
 ```yaml
 storage:
@@ -40,24 +51,51 @@ storage:
   className: local-path
 ```
 
-Changing this file requires [regenerating and pushing the YAMLs](INSTALLATION-DETAILS.md#maintainer-option-re-render-after-changing-chart-settings).
-Argo reads the generated YAMLs from Git; it does not auto-detect existing storage.
-Disabling storage installation does not uninstall an existing provisioner.
-The bundled provisioner uses `rancher.io/local-path`; do not overwrite a class
-with a different provisioner. For production, use your reviewed storage backend.
+The published default is **enabled**. Argo does not detect existing storage.
+Disabled means reuse, not uninstall. Do not replace a StorageClass's provisioner.
+
+For a fork or another branch, also set `git.repoURL` and `git.revision` in
+`DPF/site.yaml`. Public repositories use HTTPS without credentials;
+[private repositories need Git access](CREDENTIALS.md#git-access-for-external-argo).
+
+**If you changed `DPF/site.yaml`, regenerate and push before step 3:**
+
+```bash
+python3 -m venv /tmp/dsx-render-venv
+/tmp/dsx-render-venv/bin/pip install PyYAML
+render_dir=$(mktemp -d)
+/tmp/dsx-render-venv/bin/python DPF/tools/external.py \
+  --config DPF/site.yaml --output "$render_dir/generated"
+cp -a "$render_dir/generated/." DPF/generated/
+cp "$render_dir/install.yaml" DPF/install.yaml
+git diff -- DPF/site.yaml DPF/generated DPF/install.yaml
+git add DPF/site.yaml DPF/generated DPF/install.yaml
+git commit -m "Configure DPF site and storage"
+git push
+```
 
 ## 3. Install prerequisites and DPF
 
-For a staged install using the unchanged fresh-lab defaults, apply from public Git:
+Installs cert-manager, optional storage, Kamaji, Node Feature Discovery,
+Maintenance Operator, DPF operator and DPF service Argo CD.
 
+<!-- rumdl-disable MD013 -->
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml
+kubectl apply -f DPF/generated/applications/00-platform.yaml
 kubectl -n argocd patch application dpf-platform --type merge \
   -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
-kubectl -n argocd get application dpf-platform -w
+kubectl -n argocd get application dpf-platform \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 ```
+<!-- rumdl-enable MD013 -->
 
-Or apply and start sync with one line (same fresh-lab defaults, storage enabled):
+Wait for **OPERATION = Succeeded, SYNC = Synced, HEALTH = Healthy**.
+Press **Ctrl+C** to stop watching; installation keeps running.
+
+### One-liner for unchanged fresh-lab defaults
+
+Use this instead of the apply/sync above. It uses upstream Git with storage enabled.
+For customized storage or a fork, use the local YAML command above.
 
 <!-- rumdl-disable MD013 -->
 ```bash
@@ -65,53 +103,140 @@ kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/ge
 ```
 <!-- rumdl-enable MD013 -->
 
-This starts the platform stage; wait for **Synced / Healthy** before continuing.
+## 4. Set IPs and create the BMC password Secret
 
-If you customized storage or use a fork, replace the first command with
-`kubectl apply -f DPF/generated/applications/00-platform.yaml` from your reviewed
-checkout. Its repository URL/revision must point to your pushed changes.
+Edit these files under `DPF/profiles/two-tenant-hbn/desired/`:
 
-This installs cert-manager, optional storage, Kamaji, Node Feature Discovery,
-Maintenance Operator, DPF operator and DPF service Argo CD. Argo applies
-Helm-rendered YAML; Kubernetes runs the resulting pods.
-Wait for **Synced / Healthy** before continuing. No Git credentials, Argo CLI,
-Argo login or SSH tunnel are needed for these kubectl commands.
-
-## 4. Configure your site and password
-
-```bash
-git clone https://github.com/kirson-git/dsx-os.git
-cd dsx-os
-bash DPF/credentials.sh
-```
-
-The helper prompts privately for the BMC password and stores it in Kubernetes.
-It does not reset a Linux password. Never commit credentials.
-
-Edit the example YAMLs in `DPF/profiles/two-tenant-hbn/desired/`:
-
-| What to change | Files |
+| Setting | Files |
 | --- | --- |
 | Management API address | `10-operator-config/dpfoperatorconfig-dpfoperatorconfig.yaml` |
-| Tenant VIPs | `20-tenants/dpucluster-tenant-*.yaml` |
+| Europe/Asia tenant VIPs | `20-tenants/dpucluster-tenant-*.yaml` |
 | DPU BMC IPs, labels and serials | `40-provisioning/dpudevice-example-*.yaml` |
-| Matching hardware selectors | `40-provisioning/dpuset-hbn-europe.yaml`, `dpudeployment-hbn-asia.yaml` |
-| HBN/network settings | Follow [CONFIGURATION.md](CONFIGURATION.md) |
+| Matching DPU selectors | `40-provisioning/dpuset-hbn-europe.yaml`, `dpudeployment-hbn-asia.yaml` |
+| HBN interfaces and address pools | `30-hbn/` |
 
-Commit and push site changes before syncing. For a fork, also change the
-Application repository URL. The example addresses and identities are placeholders.
+[CONFIGURATION.md](CONFIGURATION.md) lists the exact fields. Replace the example
+addresses, hardware identities and network settings before continuing.
 
-## 5. Choose one deployment path
+```bash
+bash DPF/credentials.sh
+kubectl -n dpf-operator-system get secret bmc-shared-password
 
-| Option | What to use |
-| --- | --- |
-| Continue step by step | [Remaining four stage Applications](INSTALLATION-DETAILS.md#option-b-separate-yamls-for-control-of-each-stage) |
-| One YAML for a new installation | [install.yaml](install.yaml), after [preparing site settings and credentials](INSTALLATION-DETAILS.md#option-a-one-yaml-for-the-complete-stack) |
+git diff -- DPF/profiles/two-tenant-hbn/desired
+git add DPF/profiles/two-tenant-hbn/desired
+git commit -m "Configure DPF tenants and hardware"
+git push
+```
 
-**Do not apply both options to the same stack.** If you followed step 3, continue
-with the staged option. Provisioning can reimage DPUs; configure real hardware
-and the required external reboot/node-effect handling before that stage.
+The helper prompts for the BMC password privately. Never commit passwords.
+Argo reads pushed Git changes, not local edits. Your Applications must point to
+the repository and branch receiving these commits (step 2).
 
-[Detailed guide](INSTALLATION-DETAILS.md) · [Passwords and Git access](CREDENTIALS.md)
-· [Production changes](PRODUCTION.md) · [Deletion and recovery](RECOVERY.md)
-· [LLM skill](../.agents/skills/dsx-dpf-argo/SKILL.md)
+## 5. Apply DPF configuration
+
+Sets the management API endpoint and enables DPF controllers.
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f DPF/generated/applications/10-operator-config.yaml
+kubectl -n argocd patch application dpf-operator-config --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-operator-config \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+```
+<!-- rumdl-enable MD013 -->
+
+Wait for **OPERATION = Succeeded and SYNC = Synced**, then press Ctrl+C.
+The bootstrap job checks controller reconciliation; full DPF readiness comes
+later, after provisioning DPUs.
+
+## 6. Create Europe and Asia tenants
+
+Creates both tenant control planes and waits for their Kubernetes APIs.
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f DPF/generated/applications/20-tenants.yaml
+kubectl -n argocd patch application dpf-tenants --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-tenants \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+```
+<!-- rumdl-enable MD013 -->
+
+Wait for **OPERATION = Succeeded and SYNC = Synced**, then press Ctrl+C.
+
+## 7. Apply HBN networking
+
+Creates the HBN service definitions, interfaces, address pools and service chain.
+HBN runs on the DPUs after provisioning.
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f DPF/generated/applications/30-hbn.yaml
+kubectl -n argocd patch application dpf-hbn --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-hbn \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+```
+<!-- rumdl-enable MD013 -->
+
+Wait for **OPERATION = Succeeded and SYNC = Synced**, then press Ctrl+C.
+
+## 8. Provision the DPUs
+
+**This stage can reimage DPUs.** Confirm the device identities, BFB/flavor and
+fabric settings. The profile requires external reboot and node-effect handling;
+[review these steps](profiles/two-tenant-hbn/README.md) before syncing.
+
+<!-- rumdl-disable MD013 -->
+```bash
+kubectl apply -f DPF/generated/applications/40-provisioning.yaml
+kubectl -n argocd patch application dpf-provisioning --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-provisioning \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+```
+<!-- rumdl-enable MD013 -->
+
+Wait for **OPERATION = Succeeded and SYNC = Synced**, then press Ctrl+C.
+This means the manifests were applied; DPU installation can still be running.
+
+## 9. Check status
+
+```bash
+kubectl -n argocd get applications
+kubectl -n dpf-operator-system get pods
+kubectl get dpuclusters -A
+kubectl get dpus -A -w
+```
+
+Check DPU readiness, tenant workloads, HBN networking, Internet access and tenant
+isolation using the [validation guide](INSTALLATION-DETAILS.md#verify-the-deployed-outcome).
+If a sync fails, stop before the next stage and inspect its error:
+
+```bash
+kubectl -n argocd get applications \
+  -o custom-columns=NAME:.metadata.name,PHASE:.status.operationState.phase,MESSAGE:.status.operationState.message
+```
+
+## Alternative: one YAML for the full stack
+
+For a separate new installation, complete steps 1–2 and configure/push the site
+settings from step 4. Create the namespace before running the password helper:
+
+```bash
+kubectl create namespace dpf-operator-system
+bash DPF/credentials.sh
+kubectl apply -f DPF/install.yaml
+kubectl -n argocd get application dpf -w
+```
+
+Skip namespace creation if it already exists. This option automatically syncs
+all stages, including DPU provisioning. **Do not combine it with the five staged
+Applications above.**
+
+[Advanced options](INSTALLATION-DETAILS.md) · [Production](PRODUCTION.md)
+· [Deletion and recovery](RECOVERY.md) · [LLM skill](../.agents/skills/dsx-dpf-argo/SKILL.md)
+
+Clean rebuild qualification is in progress; this is not a production certification.
