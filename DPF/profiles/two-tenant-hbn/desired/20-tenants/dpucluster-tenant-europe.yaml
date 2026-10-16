@@ -1,0 +1,20 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUCluster
+metadata:
+  name: tenant-europe
+  namespace: tenant-europe
+  labels:
+    training.dpf.nvidia.com/tenant: europe
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  clusterEndpoint:
+    keepalived:
+      interface: oob0
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ''
+      vip: 192.0.2.200
+      virtualRouterID: 126
+  kubeconfig: tenant-europe-admin-kubeconfig
+  maxNodes: 1000
+  type: kamaji

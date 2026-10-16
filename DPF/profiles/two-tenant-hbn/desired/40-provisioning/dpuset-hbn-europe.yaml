@@ -1,0 +1,32 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUSet
+metadata:
+  name: hbn-europe
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+spec:
+  dpuDeviceSelector:
+    matchLabels:
+      provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.0.2.146
+      provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-europe
+  dpuNodeSelector:
+    matchLabels:
+      feature.node.kubernetes.io/dpu-enabled: 'true'
+      training.dpf.nvidia.com/selected: 'true'
+      training.dpf.nvidia.com/tenant: europe
+  dpuTemplate:
+    spec:
+      bfb:
+        name: bf-bundle-v26.4.0
+      cluster:
+        selector:
+          matchLabels:
+            training.dpf.nvidia.com/tenant: europe
+      dpuFlavor: hbn-europe-example-v26.4.0
+      nodeEffect:
+        applyOnLabelChange: false
+        force: false
+        hold: true
+  strategy:
+    type: OnDelete

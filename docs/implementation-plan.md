@@ -1,0 +1,46 @@
+# External Argo DPF recovery package implementation plan
+
+> Execute inline with superpowers:executing-plans. No live deletion is authorized
+> until the user's teardown boundary and external controller location are resolved.
+
+**Goal:** Install prerequisites and DPF with external Argo, reproduce the two-tenant
+HBN setup, and document customer production changes without publishing credentials.
+
+**Architecture:** External Argo owns the platform and root custom resources.
+A distinct service Argo in dpf-operator-system owns DPF-generated Applications.
+Same-cluster installations have one shared Argo CRD owner; separate clusters need
+CRDs on both. The sample profile is a sanitized model of the saved working lab.
+
+**Tech stack:** Pinned DPF 26.4.0 charts, Argo Helm 9.4.1, Python, Helm, YAML.
+
+**Spec:** User requirements recorded in this plan; inherited chart adaptations
+and provenance are in ../DPF/SOURCES.txt.
+
+## Constraints and review focus
+
+- Never commit credentials, private keys, kubeconfigs or raw live snapshots.
+- Keep controller namespaces, installation IDs and Application ownership distinct.
+- Keep generated DPF children outside external Argo desired state.
+- Require separate, manual provisioning sync; it can reimage hardware.
+- Record unsupported/recovery steps and qualification honestly.
+
+## Tasks
+
+- [x] Capture private lab roots, Helm overrides, host/fabric settings and evidence.
+- [x] Verify the inherited chart renderer baseline (22 tests).
+- [x] Add external renderer and tests for Argo ownership, CRD placement and hooks.
+- [x] Include sanitized Europe/Asia profile, host networking and fabric contract.
+- [x] Document bootstrap, dependency ordering, verification and production inputs.
+- [x] Render both topology variants; validate CRDs and resource uniqueness.
+- [ ] Scan the complete proposed Git payload and publish to kirson-git/dsx-os.
+- [ ] Resolve cleanup boundary and controller location with user.
+- [ ] Complete private recovery including credentials, tenant data and fabric state.
+- [ ] Preview exact teardown, then perform the agreed teardown with command logs.
+- [ ] Rebuild from external Argo and repeat both-tenant data-path acceptance checks.
+
+A passing renderer or dry-run is not a successful clean rebuild. Runtime tasks
+remain pending until performed, including reboot persistence and isolation tests.
+
+User clarification: Argo installation uses standard Helm commands, followed by
+Application YAMLs. No custom bootstrap wrapper ships. Passwords are external,
+with a private-input BMC helper and documented external-secret-manager option.

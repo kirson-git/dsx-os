@@ -1,0 +1,23 @@
+purpose: Illustrative two-tenant HBN topology; not live lab inventory
+requiredChanges:
+- management API endpoint
+- tenant VIPs and interface
+- BMC addresses and inventory identities
+- DPU node selectors and hostname patterns
+- host MAC addresses, addresses, routes and DNS
+- loopback/host IPAM pools
+- switch ASN, VRFs, VNIs, routing and ACLs
+- image/chart mirrors and credentials supplied privately
+expected:
+  europe:
+    vrf: EUROPE
+    asn: 65101
+    vni: 100001
+    host: 10.60.10.1/29
+    gateway: 10.60.10.2
+  asia:
+    vrf: ASIA
+    asn: 65201
+    vni: 100002
+    host: 10.60.20.1/29
+    gateway: 10.60.20.2

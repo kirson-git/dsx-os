@@ -1,0 +1,14 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: europe-loopback
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  ipv4Network:
+    network: 10.60.0.34/32
+    prefixSize: 32

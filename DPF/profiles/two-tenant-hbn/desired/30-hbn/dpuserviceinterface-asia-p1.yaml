@@ -1,0 +1,22 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceInterface
+metadata:
+  name: asia-p1
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: asia
+  template:
+    spec:
+      template:
+        metadata:
+          labels:
+            interface: p1
+            training.dpf.nvidia.com/tenant: asia
+        spec:
+          interfaceType: physical
+          physical:
+            interfaceName: p1

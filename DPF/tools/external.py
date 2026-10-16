@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Render prerequisites and DPF for an external Argo controller; never contacts a cluster."""
+import argparse
+import copy
+import hashlib
+import json
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
+import yaml
+import render
+
+
+def validate(cfg):
+    render.validate(cfg)
+    ext = cfg['externalArgo']
+    for key in ['namespace', 'destinationName', 'installationID', 'serviceInstallationID']:
+        value = ext[key]
+        if not isinstance(value, str) or len(value) > 63 or not re.fullmatch(r'[a-z0-9](?:[-a-z0-9]*[a-z0-9])?', value):
+            raise ValueError('externalArgo.' + key + ' must be a DNS label, 1-63 characters')
+    if type(ext['sameCluster']) is not bool:
+        raise ValueError('externalArgo.sameCluster must be a YAML boolean')
+    if cfg['argoNamespace'] != render.NS:
+        raise ValueError('This package requires the DPF service Argo in dpf-operator-system')
+    if ext['namespace'] == cfg['argoNamespace']:
+        raise ValueError('External and service Argo namespaces must differ')
+    if not ext['sameCluster'] and ext['destinationName'] == 'in-cluster':
+        raise ValueError('A separate DPF cluster needs a registered remote destination')
+    if ext['installationID'] == ext['serviceInstallationID']:
+        raise ValueError('Argo installation IDs must differ')
+    return cfg
+
+
+def argo_values(cfg):
+    validate(cfg)
+    ext = cfg['externalArgo']
+    service = yaml.safe_load((render.ROOT / 'values/argo-cd.yaml').read_text())
+    service['crds'] = {'install': not ext['sameCluster'], 'keep': True}
+    service.setdefault('configs', {}).setdefault('params', {})['application.namespaces'] = cfg['argoNamespace']
+    service['configs'].setdefault('cm', {}).update({
+        'installationID': ext['serviceInstallationID'], 'application.resourceTrackingMethod': 'annotation'})
+    platform = {
+        'crds': {'install': True, 'keep': True},
+        'dex': {'enabled': False}, 'notifications': {'enabled': False},
+        'applicationSet': {'replicas': 0},
+        'configs': {
+            'params': {'application.namespaces': ext['namespace']},
+            'cm': {'installationID': ext['installationID'], 'application.resourceTrackingMethod': 'annotation'}},
+    }
+    return platform, service
+
+
+def application(cfg, name, path):
+    validate(cfg)
+    obj = render.application(cfg)
+    obj['metadata']['name'] = name
+    obj['metadata']['namespace'] = cfg['externalArgo']['namespace']
+    obj['spec']['source']['path'] = path
+    obj['spec']['destination'] = {'name': cfg['externalArgo']['destinationName'], 'namespace': render.NS}
+    obj['spec']['syncPolicy'].pop('automated', None)
+    return obj
+
+
+def service_object(obj):
+    obj = copy.deepcopy(obj)
+    meta = obj['metadata']
+    if obj['kind'] not in render.CLUSTER_KINDS:
+        meta.setdefault('namespace', render.NS)
+    annotations = meta.setdefault('annotations', {})
+    hook = annotations.get('helm.sh/hook')
+    wave = 15
+    if hook:
+        if hook != 'pre-install,pre-upgrade' or 'redis-secret-init' not in meta['name'] or obj['kind'] not in ('ServiceAccount', 'Role', 'RoleBinding', 'Job'):
+            raise ValueError('Unreviewed service Argo Helm hook: ' + meta['name'])
+        for key in list(annotations):
+            if key.startswith('helm.sh/hook'):
+                del annotations[key]
+        wave = 14 if obj['kind'] == 'Job' else 13
+        if obj['kind'] == 'Job':
+            annotations['argocd.argoproj.io/hook'] = 'Sync'
+            annotations['argocd.argoproj.io/hook-delete-policy'] = 'BeforeHookCreation'
+    return render.prepare_object(obj, 'dpf-service-argo', wave)
+
+
+def generate(cfg, output):
+    validate(cfg)
+    output = pathlib.Path(output)
+    # Refuse reusing an output path with unknown files: render into a fresh directory.
+    if output.exists() and any(output.iterdir()):
+        raise ValueError('Output must be a new or empty directory; review/remove old generated output explicitly')
+    output.mkdir(parents=True, exist_ok=True)
+    external_values, service_values = argo_values(cfg)
+    with tempfile.TemporaryDirectory() as temporary:
+        staging = pathlib.Path(temporary)
+        objects = render.render(cfg, staging / 'platform')
+        values = staging / 'service-argo.yaml'
+        values.write_text(yaml.safe_dump(service_values, sort_keys=False))
+        command = ['helm', 'template', 'argo-cd', str(render.ROOT / 'charts/argo-cd-9.4.1.tgz'),
+                   '--namespace', render.NS, '--include-crds', '--kube-version', cfg['kubernetesVersion'], '--values', str(values)]
+        objects.extend(service_object(o) for o in yaml.safe_load_all(render.run(command)) if o)
+    keys = [(o['apiVersion'], o['kind'], o['metadata'].get('namespace', ''), o['metadata']['name']) for o in objects]
+    if len(keys) != len(set(keys)):
+        raise ValueError('Duplicate resource identity')
+    platform_dir = output / 'platform'
+    platform_dir.mkdir()
+    payload = '# Generated by tools/external.py; edit source configuration, not this file.\n' + yaml.safe_dump_all(objects, sort_keys=False)
+    (platform_dir / 'platform.yaml').write_text(payload)
+    (output / 'external-argo-values.yaml').write_text(yaml.safe_dump(external_values, sort_keys=False))
+    (output / 'service-argo-values.yaml').write_text(yaml.safe_dump(service_values, sort_keys=False))
+    applications = output / 'applications'
+    applications.mkdir()
+    (applications / '00-platform.yaml').write_text(yaml.safe_dump(application(cfg, 'dpf-platform', cfg['git']['path']), sort_keys=False))
+    profile_path = 'DPF/profiles/two-tenant-hbn/desired'
+    for stage in ['10-operator-config', '20-tenants', '30-hbn', '40-provisioning']:
+        obj = application(cfg, 'dpf-' + stage[3:], profile_path + '/' + stage)
+        (applications / (stage + '.yaml')).write_text(yaml.safe_dump(obj, sort_keys=False))
+    report = {'site': cfg, 'resources': len(objects), 'platformSHA256': hashlib.sha256(payload.encode()).hexdigest(),
+              'validation': 'Offline render only; no live install, migration, cleanup or DPU provisioning performed.'}
+    (output / 'render-report.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(f'Rendered {len(objects)} resources and external-Argo Application to {output}', file=sys.stderr)
+    return objects
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config', type=pathlib.Path, default=render.ROOT / 'site.yaml')
+    parser.add_argument('--output', type=pathlib.Path, default=render.ROOT / 'generated')
+    args = parser.parse_args()
+    try:
+        generate(yaml.safe_load(args.config.read_text()), args.output)
+    except (ValueError, KeyError, TypeError, OSError, yaml.YAMLError, subprocess.CalledProcessError) as error:
+        print('ERROR: ' + str(error), file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError):
+            print(error.stderr, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

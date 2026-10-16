@@ -1,0 +1,32 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    europe_mgmt:
+      match:
+        macaddress: 02:00:00:00:01:01
+      set-name: mgmt0
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses:
+        - 192.0.2.131/25
+      routes:
+        - to: 192.0.2.0/25
+          via: 192.0.2.254
+    europe_hbn_pf0:
+      match:
+        macaddress: 02:00:00:00:01:02
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses:
+        - 10.60.10.1/29
+      mtu: 1500
+      nameservers:
+        addresses:
+          - 192.0.2.53
+          - 198.51.100.53
+      routes:
+        - to: default
+          via: 10.60.10.2

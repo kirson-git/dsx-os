@@ -1,0 +1,21 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceTemplate
+metadata:
+  name: doca-hbn-asia
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  deploymentServiceName: doca-hbn
+  helmChart:
+    source:
+      chart: doca-hbn
+      repoURL: https://helm.ngc.nvidia.com/nvidia/doca
+      version: 3.4.0
+    values:
+      image:
+        repository: nvcr.io/nvidia/doca/doca_hbn
+        tag: 3.4.0-doca3.4.0
+      resources:
+        memory: 6Gi
+        nvidia.com/bf_sf: 3

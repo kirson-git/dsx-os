@@ -1,0 +1,15 @@
+crds:
+  install: true
+  keep: true
+dex:
+  enabled: false
+notifications:
+  enabled: false
+applicationSet:
+  replicas: 0
+configs:
+  params:
+    application.namespaces: argocd
+  cm:
+    installationID: dsx-platform
+    application.resourceTrackingMethod: annotation

@@ -1,0 +1,46 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceChain
+metadata:
+  name: europe-hbn
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  template:
+    spec:
+      template:
+        spec:
+          switches:
+          - ports:
+            - serviceInterface:
+                matchLabels:
+                  interface: p0
+                  training.dpf.nvidia.com/tenant: europe
+            - serviceInterface:
+                matchLabels:
+                  svc.dpu.nvidia.com/interface: p0_if
+                  svc.dpu.nvidia.com/service: doca-hbn-europe
+            serviceMTU: 1500
+          - ports:
+            - serviceInterface:
+                matchLabels:
+                  interface: p1
+                  training.dpf.nvidia.com/tenant: europe
+            - serviceInterface:
+                matchLabels:
+                  svc.dpu.nvidia.com/interface: p1_if
+                  svc.dpu.nvidia.com/service: doca-hbn-europe
+            serviceMTU: 1500
+          - ports:
+            - serviceInterface:
+                matchLabels:
+                  interface: pf0hpf
+                  training.dpf.nvidia.com/tenant: europe
+            - serviceInterface:
+                matchLabels:
+                  svc.dpu.nvidia.com/interface: pf0hpf_if
+                  svc.dpu.nvidia.com/service: doca-hbn-europe
+            serviceMTU: 1500

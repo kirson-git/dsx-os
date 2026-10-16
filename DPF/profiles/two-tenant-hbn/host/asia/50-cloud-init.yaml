@@ -1,0 +1,29 @@
+# Illustrative bridge management / HBN data network; replace interface names.
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    mgmt-nic:
+      dhcp4: false
+    dpu-pf0:
+      dhcp4: false
+      addresses:
+        - 10.60.20.1/29
+      nameservers:
+        addresses:
+          - 192.0.2.53
+          - 198.51.100.53
+      routes:
+        - to: default
+          via: 10.60.20.2
+  bridges:
+    br0:
+      interfaces:
+        - mgmt-nic
+      macaddress: 02:00:00:00:02:01
+      dhcp4: true
+      dhcp4-overrides:
+        use-routes: false
+        use-dns: false
+        use-domains: false
+      accept-ra: false

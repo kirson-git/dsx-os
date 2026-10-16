@@ -1,0 +1,7 @@
+b281c349053e1de4c773977e3644e5b71ba8fee5f14e260085e496e96217bf10  charts/argo-cd-9.4.1.tgz
+a2ba409c7be5b8c5e98d052125d8c499c030c4e60f3a5ee3f90b38de0816eb51  charts/cert-manager-v1.19.3.tgz
+0f9a18a0d64958e2f1769bdb468a46ad65e0ea485dadb86cad9e6457b3cec69a  charts/dpf-operator-v26.4.0.tgz
+43ab7711f8ea49dd3a9b3b587585dd1769b5cc5591232d91f940b4a02be3322a  charts/kamaji-1.2.0.tgz
+d6411c21f1aafb9d477908c68bf05cc9e352e1d3f1044530b3b38d03c4aae4b5  charts/local-path-provisioner-0.0.34.tgz
+2dabc4e1ddbb4119ea2235b79a43362511cf39ca2146458b8b66d4c2c008d8db  charts/maintenance-operator-chart-0.3.0.tgz
+0cb59bd70444d3d426ffd53fd242ae433118d7ebb9d2ad32d3db99be8a523e16  charts/node-feature-discovery-chart-0.18.3.tgz

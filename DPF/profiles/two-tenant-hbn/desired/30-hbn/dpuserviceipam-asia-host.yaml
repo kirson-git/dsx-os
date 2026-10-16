@@ -1,0 +1,15 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: asia-host
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: asia
+  ipv4Network:
+    gatewayIndex: 2
+    network: 10.60.20.0/29
+    prefixSize: 29

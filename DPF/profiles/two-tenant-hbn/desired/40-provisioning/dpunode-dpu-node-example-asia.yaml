@@ -1,0 +1,16 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUNode
+metadata:
+  name: dpu-node-example-asia
+  namespace: dpf-operator-system
+  labels:
+    feature.node.kubernetes.io/dpu-enabled: 'true'
+    training.dpf.nvidia.com/selected: 'true'
+    training.dpf.nvidia.com/tenant: asia
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+spec:
+  dpus:
+  - name: example-asia
+  nodeRebootMethod:
+    external: {}

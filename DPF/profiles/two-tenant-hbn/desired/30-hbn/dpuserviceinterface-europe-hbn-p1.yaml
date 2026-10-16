@@ -1,0 +1,25 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceInterface
+metadata:
+  name: europe-hbn-p1
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  template:
+    metadata: {}
+    spec:
+      template:
+        metadata:
+          labels:
+            svc.dpu.nvidia.com/interface: p1_if
+            svc.dpu.nvidia.com/service: doca-hbn-europe
+        spec:
+          interfaceType: service
+          service:
+            interfaceName: p1_if
+            network: mybrhbn
+            serviceID: doca-hbn-europe

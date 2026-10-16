@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-provisioning
+  namespace: argocd
+  labels:
+    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+spec:
+  project: default
+  source:
+    repoURL: ssh://git@github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/profiles/two-tenant-hbn/desired/40-provisioning
+    directory:
+      recurse: false
+      include: '*.yaml'
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

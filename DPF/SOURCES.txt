@@ -1,0 +1,89 @@
+CUSTOMER DPF ARGO CD KIT — DPF 26.4.0
+
+Pinned chart files:
+  argo-cd 9.4.1                       https://argoproj.github.io/argo-helm
+  cert-manager v1.19.3                https://charts.jetstack.io
+  node-feature-discovery 0.18.3       https://kubernetes-sigs.github.io/node-feature-discovery/charts
+  maintenance-operator-chart 0.3.0    oci://ghcr.io/mellanox/maintenance-operator-chart
+  kamaji 1.2.0                       oci://ghcr.io/nvidia/charts/kamaji
+  dpf-operator v26.4.0               https://helm.ngc.nvidia.com/nvidia/doca
+  local-path-provisioner 0.0.34      https://github.com/rancher/local-path-provisioner/tree/v0.0.34/deploy/chart/local-path-provisioner
+
+The first six are bundled copies of chart archives saved with our original
+DPF 26.4.0 installation guide. SHA256SUMS records their bytes; upstream signatures
+were not independently verified for this package. Local Path Provisioner was
+packaged from the saved unmodified upstream chart at commit
+af49f3fdf69e2e5ad790d295b6005ba3767ec991.
+
+values/*.yaml are copied unchanged from NVIDIA/doca-platform v26.4.0,
+commit 8551df0d3ac4ed51a67d4a5148a7646493a30e10, deploy/helmfiles/values/.
+LICENSE.dpf and LICENSE.local-path accompany these copied sources; upstream
+chart archives retain their included metadata/licenses. This is a project-authored
+GitOps adaptation. It is not represented as an NVIDIA-supported installer.
+
+Explicit renderer adaptations:
+- Helm template includes chart CRDs. Argo uses server-side apply and explicit
+  resource sync waves. Namespaced resources have explicit metadata.namespace.
+- Kamaji replicaCount=2 uses the actual chart key. The upstream values spell
+  replicas: 2, which the pinned chart does not read.
+- Kamaji defaultDatastoreName is empty, preventing its default-datastore admission
+  bootstrap dependency. The named default DataStore is created at wave 32.
+  DPF 26.4.0 explicitly sets dataStore: default on its TenantControlPlane requests:
+  https://github.com/NVIDIA/doca-platform/blob/v26.4.0/internal/clustermanager/kamaji/handler.go
+- Kamaji etcd PVCs use site.storage.className. The bundled local-path chart is
+  omitted when the customer supplies existing storage.
+- Kamaji Helm hook RBAC/config are persistent resources. Setup jobs are Sync
+  hooks at waves 21/31, retained for diagnosis until BeforeHookCreation replaces
+  them on the next sync. Delete/teardown hooks and Helm test hooks are omitted.
+- Certificate job uses portable shell redirection, exits on failure and refuses
+  a partially existing certificate pair. cfssl init image is v1.6.5 (verified
+  available), replacing the chart's hardcoded latest; the NVIDIA cfssl value
+  alone does not affect that template.
+- The etcd authentication job repairs partial setup: ensure root user, ensure
+  root role, always grant it, enable authentication and inspect status. etcd
+  v3.5.6 AuthEnable is idempotent when already enabled:
+  https://github.com/etcd-io/etcd/blob/v3.5.6/server/auth/store.go
+- MaintenanceOperatorConfig is wave 41, after its controller/webhook at 40.
+- DPFOperatorConfig follows the Zero Trust or Host Trusted upstream template and
+  receives customer inputs. argoCDNamespace is explicit. No physical inventory,
+  BMC passwords, tenant addresses or BFB/service selections are copied from our lab.
+- Argo CD bootstrap uses NVIDIA values plus annotation tracking to preserve Helm
+  release labels. Argo bootstrap itself is a Helm release outside the Application.
+- All other resources follow the pinned charts/values. Controller-created objects,
+  runtime certificates and DPU service Applications are not pre-rendered here.
+
+References:
+https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites
+https://networking-docs.nvidia.com/dpf/26.4.0/zero-trust-deployment
+https://networking-docs.nvidia.com/dpf/26.4.0/host-trusted-deployment
+https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/
+https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
+https://argo-cd.readthedocs.io/en/stable/user-guide/resource_tracking/
+https://argo-cd.readthedocs.io/en/stable/operator-manual/app-any-namespace/
+
+Scope: connected management platform installation. Not an air-gap image mirror,
+Kubernetes installer, production HA design, physical DPU onboarding bundle,
+HBN/Argus deployment, existing deployment migration or upgrade qualification.
+
+Optional tenant extension:
+- DPF 26.4.0 DPUCluster API and bundled CRD schema:
+  https://networking-docs.nvidia.com/dpf/26.4.0/dpucluster
+- Same pinned NVIDIA source as above: internal/clustermanager/kamaji/handler.go
+  confirms TenantControlPlanes use their DPUCluster name and namespace.
+- Tenant resources use wave 70, after DPFOperatorConfig at wave 60. The shared
+  controller/store remain in dpf-operator-system; tenant control planes have
+  separate namespaces. Settings ship disabled with placeholder VIPs/interfaces.
+- Site validation supports IPv4/keepalived, unique tenant names and VRRP IDs,
+  and the DPUCluster maxNodes schema bound. It is not network/IPAM validation.
+
+DSX OS external-Argo adaptation, 2026-10-16:
+- Imported charts, values, base renderer and tests from kirson-git/openshell-dpu
+  commit c5af6e9034d8cb407d973a0e483befccaf858b04.
+- tools/external.py is the public rendering entrypoint. Its Application namespace
+  is independent of the DPF service Argo namespace. The generated manifests include
+  the service Argo; its Redis init hook uses persistent RBAC then a Sync Job.
+- External Argo bootstrap owns Argo CRDs on a shared cluster; on separate clusters
+  the service chart installs its own cluster's CRDs. Installation IDs and namespace
+  watch scopes are distinct. Initial Application sync is manual, without pruning.
+- profiles/two-tenant-hbn models the observed lab root resources using illustrative
+  addresses and hardware identities. It includes no live credentials or raw logs.

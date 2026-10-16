@@ -1,0 +1,20 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUCluster
+metadata:
+  name: tenant-asia
+  namespace: tenant-asia
+  labels:
+    training.dpf.nvidia.com/tenant: asia
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  clusterEndpoint:
+    keepalived:
+      interface: oob0
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ''
+      vip: 192.0.2.203
+      virtualRouterID: 127
+  kubeconfig: tenant-asia-admin-kubeconfig
+  maxNodes: 1000
+  type: kamaji

@@ -1,0 +1,68 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceConfiguration
+metadata:
+  name: doca-hbn-asia
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  deploymentServiceName: doca-hbn
+  interfaces:
+  - name: p0_if
+    network: mybrhbn
+  - name: p1_if
+    network: mybrhbn
+  - name: pf0hpf_if
+    network: mybrhbn
+  serviceConfiguration:
+    helmChart:
+      values:
+        configuration:
+          perDPUValuesYAML: "- hostnamePattern: dpu-node-example-asia*\n  values:\n\
+            \    bgp_peer_group: hbn\n    vrf1: ASIA\n    l3vni1: 100002\n    bgp_autonomous_system:\
+            \ 65201\n"
+          startupYAMLJ2: "- header:\n    model: bluefield\n    nvue-api-version: nvue_v1\n\
+            \    rev-id: 1.0\n    version: HBN 2.4.0\n- set:\n    evpn:\n      enable:\
+            \ on\n      route-advertise: {}\n    interface:\n      lo:\n        ip:\n\
+            \          address:\n            {{ ipaddresses.ip_lo.ip }}/32: {}\n \
+            \       type: loopback\n      p0_if,p1_if,pf0hpf_if:\n        type: swp\n\
+            \        link:\n          mtu: 9000\n      pf0hpf_if:\n        ip:\n \
+            \         address:\n            {{ ipaddresses.ip_pf0hpf.cidr }}: {}\n\
+            \          vrf: {{ config.vrf1 }}\n    nve:\n      vxlan:\n        arp-nd-suppress:\
+            \ on\n        enable: on\n        source:\n          address: {{ ipaddresses.ip_lo.ip\
+            \ }}\n    router:\n      bgp:\n        enable: on\n        graceful-restart:\n\
+            \          mode: full\n    vrf:\n      default:\n        router:\n   \
+            \       bgp:\n            address-family:\n              ipv4-unicast:\n\
+            \                enable: on\n                redistribute:\n         \
+            \         connected:\n                    enable: on\n               \
+            \ multipaths:\n                  ebgp: 16\n              l2vpn-evpn:\n\
+            \                enable: on\n            autonomous-system: {{ config.bgp_autonomous_system\
+            \ }}\n            enable: on\n            neighbor:\n              p0_if:\n\
+            \                peer-group: {{ config.bgp_peer_group }}\n           \
+            \     type: unnumbered\n                address-family:\n            \
+            \      l2vpn-evpn:\n                    enable: on\n                 \
+            \   add-path-tx: off\n              p1_if:\n                peer-group:\
+            \ {{ config.bgp_peer_group }}\n                type: unnumbered\n    \
+            \            address-family:\n                  l2vpn-evpn:\n        \
+            \            enable: on\n                    add-path-tx: off\n      \
+            \      path-selection:\n              multipath:\n                aspath-ignore:\
+            \ on\n            peer-group:\n              {{ config.bgp_peer_group\
+            \ }}:\n                address-family:\n                  ipv4-unicast:\n\
+            \                    enable: on\n                  l2vpn-evpn:\n     \
+            \               enable: on\n                remote-as: external\n    \
+            \        router-id: {{ ipaddresses.ip_lo.ip }}\n      {{ config.vrf1 }}:\n\
+            \        evpn:\n          enable: on\n          vni:\n            {{ config.l3vni1\
+            \ }}: {}\n        router:\n          bgp:\n            address-family:\n\
+            \              ipv4-unicast:\n                enable: on\n           \
+            \     redistribute:\n                  connected:\n                  \
+            \  enable: on\n                route-export:\n                  to-evpn:\n\
+            \                    enable: on\n            autonomous-system: {{ config.bgp_autonomous_system\
+            \ }}\n            enable: on\n"
+    serviceDaemonSet:
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[{"name": "iprequest", "interface": "ip_lo",
+          "cni-args": {"poolNames": ["asia-loopback"], "poolType": "cidrpool"}}, {"name":
+          "iprequest", "interface": "ip_pf0hpf", "cni-args": {"poolNames": ["asia-host"],
+          "poolType": "cidrpool", "allocateDefaultGateway": true}}]'
+  upgradePolicy:
+    applyNodeEffect: false

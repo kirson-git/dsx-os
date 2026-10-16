@@ -1,0 +1,15 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: europe-host
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  ipv4Network:
+    gatewayIndex: 2
+    network: 10.60.10.0/29
+    prefixSize: 29

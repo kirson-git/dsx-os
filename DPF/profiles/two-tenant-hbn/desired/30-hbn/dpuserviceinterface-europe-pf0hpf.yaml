@@ -1,0 +1,22 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceInterface
+metadata:
+  name: europe-pf0hpf
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: europe
+  template:
+    spec:
+      template:
+        metadata:
+          labels:
+            interface: pf0hpf
+            training.dpf.nvidia.com/tenant: europe
+        spec:
+          interfaceType: pf
+          pf:
+            pfID: 0

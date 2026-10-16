@@ -1,0 +1,18 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUDevice
+metadata:
+  name: example-europe
+  namespace: dpf-operator-system
+  labels:
+    provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.0.2.146
+    provisioning.dpu.nvidia.com/dpudevice-opn: 900-9D3B4-00CV-EA0
+    provisioning.dpu.nvidia.com/dpudevice-psid: EXAMPLEEUROPE
+    provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-europe
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  bmcIp: 192.0.2.146
+  bmcPort: 443
+  numberOfPFs: 1
+  opn: 900-9D3B4-00CV-EA0
+  serialNumber: EXAMPLEEUROPE

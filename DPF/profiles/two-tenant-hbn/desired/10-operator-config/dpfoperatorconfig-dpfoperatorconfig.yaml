@@ -1,0 +1,31 @@
+apiVersion: operator.dpu.nvidia.com/v1alpha1
+kind: DPFOperatorConfig
+metadata:
+  name: dpfoperatorconfig
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  dpuDetector:
+    disable: true
+  kamajiClusterManager:
+    disable: false
+    replicas: 2
+  networking:
+    controlPlaneMTU: 1500
+    highSpeedMTU: 1500
+  overrides:
+    kubernetesAPIServerPort: 6443
+    kubernetesAPIServerVIP: 198.51.100.20
+    argoCDNamespace: dpf-operator-system
+  provisioningController:
+    dmsTimeout: 900
+    installInterface:
+      installViaRedfish:
+        skipDPUNodeDiscovery: false
+    maxDPUParallelInstallations: 50
+    maxUnavailableDPUNodes: 50
+    multiDPUOperationsSyncWaitTime: 30s
+    nodeEffectRemovalTimeout: 0s
+    osInstallTimeout: 45m
+    replicas: 2
