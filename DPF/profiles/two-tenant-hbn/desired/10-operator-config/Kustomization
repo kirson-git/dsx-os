@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- checks-dpf-operator-system-dpfoperatorconfigs.yaml
+- checks-dpf-operator-system-secrets.yaml
+- checks-service-account.yaml
+- dpf-wait-operator.yaml
+- dpfoperatorconfig-dpfoperatorconfig.yaml

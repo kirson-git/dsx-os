@@ -3,6 +3,14 @@
 Follow these steps in order, in the same terminal. You need Git, Helm, kubectl
 and access to a working Kubernetes cluster. This installs standalone DPF 26.4.0.
 
+## Use the saved lab IPs without cloning Git
+
+For the existing NICo lab, use the [lab Application file](labs/nico-lab/README.md).
+It contains the management IP, Europe/Asia VIPs and interface overrides. Follow
+that guide after platform installation instead of generic steps 5–6. Step 4
+still applies to the password and later HBN/hardware settings. For another site,
+download that small file, edit its values and apply it.
+
 ## Before you start
 
 If you cannot push to this repository, fork it on GitHub and replace the clone

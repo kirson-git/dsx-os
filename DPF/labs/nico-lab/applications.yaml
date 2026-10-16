@@ -1,0 +1,93 @@
+# Lab settings: edit the patch values below for a different site. No passwords.
+# Requires dpf-platform Synced/Healthy. Sync operator config first, then tenants.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-operator-config
+  namespace: argocd
+  labels:
+    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+    customer.dpf.nvidia.com/site: nico-lab
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/profiles/two-tenant-hbn/desired/10-operator-config
+    kustomize:
+      patches:
+      - target:
+          kind: DPFOperatorConfig
+          name: dpfoperatorconfig
+        patch: |
+          - op: replace
+            path: /spec/overrides/kubernetesAPIServerVIP
+            value: 10.220.175.20
+          - op: replace
+            path: /spec/overrides/kubernetesAPIServerPort
+            value: 6443
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-tenants
+  namespace: argocd
+  labels:
+    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+    customer.dpf.nvidia.com/site: nico-lab
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: DPF/profiles/two-tenant-hbn/desired/20-tenants
+    kustomize:
+      patches:
+      - target:
+          kind: DPUCluster
+          name: tenant-europe
+        patch: |
+          - op: replace
+            path: /spec/clusterEndpoint/keepalived/vip
+            value: 192.168.0.200
+          - op: replace
+            path: /spec/clusterEndpoint/keepalived/interface
+            value: enp7s0
+      - target:
+          kind: DPUCluster
+          name: tenant-asia
+        patch: |
+          - op: replace
+            path: /spec/clusterEndpoint/keepalived/vip
+            value: 192.168.0.203
+          - op: replace
+            path: /spec/clusterEndpoint/keepalived/interface
+            value: enp7s0
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

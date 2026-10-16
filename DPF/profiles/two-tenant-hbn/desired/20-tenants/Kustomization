@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- checks-tenant-asia-dpuclusters.yaml
+- checks-tenant-europe-dpuclusters.yaml
+- dpf-wait-tenants.yaml
+- dpucluster-tenant-asia.yaml
+- dpucluster-tenant-europe.yaml
+- namespace-tenant-asia.yaml
+- namespace-tenant-europe.yaml
