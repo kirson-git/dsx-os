@@ -1,15 +1,62 @@
 # Install DPF with Argo CD
 
-Follow these steps in order, in the same terminal. You need Git, Helm, kubectl
-and access to a working Kubernetes cluster. This installs standalone DPF 26.4.0.
+Use a working Kubernetes cluster with Helm and kubectl. The full walkthrough
+uses Git; the site-file workflow below does not. This installs standalone DPF 26.4.0.
 
-## Use the saved lab IPs without cloning Git
+## One editable site file — no Git clone
 
-For the existing NICo lab, use the [lab Application file](labs/nico-lab/README.md).
-It contains the management IP, Europe/Asia VIPs and interface overrides. Follow
-that guide after platform installation instead of generic steps 5–6. Step 4
-still applies to the password and later HBN/hardware settings. For another site,
-download that small file, edit its values and apply it.
+After `dpf-platform` is Synced / Healthy, download
+[dpf-site.yaml](dpf-site.yaml). Edit the values marked `EDIT`: management API IP
+and port, both tenant VIPs, and the interface on the management nodes.
+
+```bash
+curl -fL \
+  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/dpf-site.yaml \
+  -o dpf-site.yaml
+vi dpf-site.yaml
+kubectl apply -f dpf-site.yaml
+```
+
+Argo fetches the base manifests from Git and uses the settings in your local file.
+No Git push is needed for these IP overrides. Keep your edited file for reuse.
+This configures the operator and tenants; passwords, HBN and DPU provisioning
+remain separate steps. Reserve tenant VIPs outside DHCP. Do not sync the example
+addresses before editing them.
+
+**First, sync DPF configuration:**
+
+```bash
+kubectl -n argocd patch application dpf-operator-config --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-operator-config -w
+```
+
+Wait for the sync operation to succeed, then press Ctrl+C to stop watching.
+Check its result with:
+
+```bash
+kubectl -n argocd get application dpf-operator-config \
+  -o jsonpath='{.status.operationState.phase}{"\n"}{.status.operationState.message}{"\n"}'
+```
+
+**Then, sync tenants:**
+
+```bash
+kubectl -n argocd patch application dpf-tenants --type merge \
+  -p '{"operation":{"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-tenants -w
+```
+
+These reuse the staged Application names. Do not apply the generic configuration
+and tenant Application files afterward; they would remove your overrides.
+Do not combine this option with the full-stack `dpf` Application.
+
+For our existing lab, the [lab file](labs/nico-lab/applications.yaml) already
+has the saved IPs. If you applied it, start with the first sync command above;
+do not replace it with the customer template. [Lab instructions](labs/nico-lab/README.md).
+
+The full walkthrough below also covers prerequisites and later HBN/provisioning.
+Skip steps 5–6 there if you used this site-file workflow.
 
 ## Before you start
 
