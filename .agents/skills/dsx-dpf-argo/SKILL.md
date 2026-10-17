@@ -71,7 +71,8 @@ Do not claim a local edit changes what Argo reads from Git.
 - External Argo runs in `argocd`; DPF service Argo runs in
   `dpf-operator-system`. Keep their installation IDs and watch scopes distinct.
 - Public Git sources use HTTPS. SSH URLs still require authentication.
-- Recommended: `dpf-platform` plus `DPF/config.yaml` (`dpf-site`). Customers
+- Platform/tenant-only alternative: `dpf-platform` plus `DPF/config.yaml`
+  (`dpf-site`). Customers
   edit only `config.yaml`; its Helm values configure operator/tenants and optional
   DHCP. Do not combine it with `dpf-operator-config` or `dpf-tenants`.
 - Alternatives: the full-stack `DPF/install.yaml` Application **or** the five
@@ -99,7 +100,9 @@ phase accurately. Never infer DPU readiness from Argo Synced alone.
 Large CRDs need `ServerSideApply=true`. Argo 3.3.0 supports
 `ClientSideApplyMigration=false` to bypass client-side migration. A kubectl
 operation must carry both sync options and retry policy; direct kubectl patches
-do not copy `spec.syncPolicy.retry`. The short guide has the complete command.
+do not copy `spec.syncPolicy.retry`. The [platform/tenant guide](../../../DPF/PLATFORM-AND-TENANTS.md)
+has the complete manual sync command. The main README covers the prepared
+combined Application instead.
 External Argo must load `DPF/values/external-argo.yaml`: its CRD health rule treats
 normal establishment as Progressing and preserves name/schema errors. Keep this
 Helm-owned setting outside the DPF Application. A failed operation does not resume

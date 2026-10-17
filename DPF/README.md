@@ -1,211 +1,139 @@
-# Install DPF with Argo CD
+# Install DPF + HBN with Argo CD
 
-**Presenting the prepared lab?** Use the [copy-paste TXT demo book](DEMO.txt).
+Six steps for the **prepared Europe/Asia lab on nico-lab**.
+Requires working management Kubernetes, Git, kubectl, Helm, Python 3 and PyYAML.
+Existing host Ubuntu, DHCP and switch/router settings stay in place.
 
-**Full lab reinstall:** use the [Bash menu](INSTALLER.md) to install external
-Argo with Helm, set passwords, and apply one prepared DPF Application. It also
-provides step-by-step actions and a full DPF/prerequisite/Argo cleanup.
-**Passwords and connectivity:** follow [these three short steps](PASSWORDS.md)
-to validate DPU BMC/iDRAC access from a temporary pod before saving Secrets.
-Keep management Kubernetes, Ubuntu hosts, DHCP and fabric. The staged workflow
-below is a separate option; do not apply both.
-
-**One file to edit: [config.yaml](config.yaml).** It contains the Kubernetes API,
-tenant VIPs, optional DHCP and MAC reservations. Argo reads the templates from
-Git. Passwords stay outside Git; the public file has blank MAC fields.
-
-## How it fits together
-
-```mermaid
-flowchart TB
-    subgraph K8S["1. Management Kubernetes cluster — 3 nodes"]
-        Argo["External Argo CD"]
-        Prereqs["Storage · cert-manager · Kamaji · NFD · Maintenance"]
-        DPF["2. DPF operator and controllers"]
-        Argo --> Prereqs
-        Argo --> DPF
-        Prereqs --> DPF
-    end
-    subgraph Devices["3. DPUs we want to configure"]
-        Europe["Europe DPU · Europe tenant"]
-        Asia["Asia DPU · Asia tenant"]
-    end
-    DPF -->|"Provision OS and deploy DPU services"| Europe
-    DPF -->|"Provision OS and deploy DPU services"| Asia
+```text
+Management Kubernetes -> DPF -> Europe DPU + Asia DPU
+                            -> HBN + Zero Trust provisioning
 ```
 
-The steps below install prerequisites, configure DPF and create both tenant APIs.
-**HBN and hardware provisioning follow later.** Applying this configuration does
-not reimage DPUs.
+## Step 1 — Get the installer
 
-## Step 1 — External Argo CD and DPF platform
-
-Requires a working management Kubernetes cluster, Helm and kubectl.
-**Our lab already has external Argo CD: skip its Helm install, but apply the
-[startup fix](#existing-argo--apply-the-startup-fix-once) once before syncing.**
-On a new cluster, install it first:
+Run in Bash on the administration server:
 
 ```bash
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update argo
-helm install external-argo-cd argo/argo-cd \
-  --version 9.4.1 \
-  --namespace argocd --create-namespace \
-  --set configs.cm.installationID=dsx-platform \
-  -f \
-  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
-  --wait --timeout 10m
+test -d /tmp/dsx-os-dpf/.git || \
+  git clone https://github.com/kirson-git/dsx-os.git /tmp/dsx-os-dpf
+cd /tmp/dsx-os-dpf
+git pull --ff-only
+kubectl get nodes
+command -v helm kubectl python3
+python3 -c 'import yaml'
 ```
 
-Install the prerequisites and DPF 26.4.0. Published defaults **enable Local Path
-storage**, suitable for our cleaned lab. To reuse existing storage, follow the
-[storage setting](STAGED-INSTALL.md#2-choose-storage) before applying.
+Expected: management nodes `Ready`; tools available.
+
+## Step 2 — Edit your IP settings
+
+Your prepared file is local, outside Git. For another site,
+[prepare its Application first](TWO-COMMAND-INSTALL.md#prepare-a-sites-application-once).
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml
-kubectl -n argocd patch application dpf-platform --type merge \
-  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
-kubectl -n argocd get application dpf-platform -w
+vi /tmp/dpf-lab/install.yaml
 ```
 
-The Argo settings wait for CRD establishment. The sync then waits for
-cert-manager’s API readiness check before creating dependent certificates.
-The command includes up to five automatic retries for transient failures.
-Start sync once; do not launch another while it is `Running`.
-Wait for `Synced` / `Healthy`, then press Ctrl+C. Before continuing, verify that
-this command prints `Succeeded`:
+| Setting | Europe | Asia |
+| --- | --- | --- |
+| Tenant API VIP | `192.168.0.200` | `192.168.0.203` |
+| DPU BMC | `192.168.0.246` | `192.168.0.249` |
+| Server iDRAC | `192.168.0.241` | `192.168.0.243` |
+| DPU OS, existing DHCP | `192.168.0.244` | `192.168.0.242` |
+| Ubuntu data IP, retained | `10.0.0.2/24` | `10.0.0.1/24` |
+
+Management API: `10.220.175.20`. Keep `install-dhcp: "no"`: existing DHCP
+supplies the DPU OS addresses. Tenant VIPs are manual reservations.
+BMC address changes must also update matching labels/selectors in this file.
+
+## Step 3 — Enter passwords and check access
+
+Both management usernames are `root` in this BF3 lab. Passwords stay outside Git.
+**If the two files already contain your passwords, skip the input lines.**
 
 ```bash
-kubectl -n argocd get application dpf-platform -o jsonpath='{.status.operationState.phase}{"\n"}'
+install -d -m 700 /tmp/dpf-lab/private
+umask 077
+read -r -s -p 'DPU BMC password: ' dpf_password; printf '\n'
+printf '%s' "$dpf_password" > /tmp/dpf-lab/private/bmc-password; unset dpf_password
+read -r -s -p 'Server iDRAC password: ' dpf_password; printf '\n'
+printf '%s' "$dpf_password" > /tmp/dpf-lab/private/idrac-password; unset dpf_password
+chmod 600 /tmp/dpf-lab/private/bmc-password /tmp/dpf-lab/private/idrac-password
+
+bash DPF/bootstrap-credentials.sh --config /tmp/dpf-lab/install.yaml \
+  --bmc-password-file /tmp/dpf-lab/private/bmc-password \
+  --idrac-password-file /tmp/dpf-lab/private/idrac-password \
+  --insecure-bmc --check-only
 ```
 
-## Step 2 — Edit your one configuration file
+Expected: **four PASS results** from a temporary Kubernetes pod.
+This checks BMC/iDRAC credentials and serials, not SSH or DHCP.
+`--insecure-bmc` accepts our self-signed lab certificates; omit it for trusted
+certificates. iDRAC TLS checking follows `bootstrap.hosts[].verifyTLS`.
 
-For a new customer, download the public template:
+## Step 4 — Install external Argo CD
+
+**Replacing the old staged Applications?** Complete cleanup first, or keep the
+working demo. Do not combine `dpf-platform`, `dpf-site`, `dpf-hbn` and
+`dpf-provisioning` with the new `dpf` app. Skip cleanup on a fresh cluster.
+
+**Optional clean reset — destructive:**
+
+Removes DPF/HBN, tenants and their storage, dedicated prerequisites, external
+Argo and their CRDs. Keeps management Kubernetes, host Ubuntu and external networking.
 
 ```bash
-curl -fL \
-  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml \
-  -o config.yaml
-vi config.yaml
+bash DPF/install.sh --action delete-plan
+bash DPF/install.sh --action delete
 ```
 
-For our lab, the populated file is already on the administration server:
+Type the exact cluster context. Stop on errors.
+
+Install/upgrade external Argo using Helm; the script prints its commands:
 
 ```bash
-cd /tmp/dpf-lab
-vi config.yaml
+bash DPF/install.sh --action argo
 ```
 
-Use **one** of these paths; do not overwrite your populated file with a download.
-Review the lines marked `# please change here`:
+Expected: the Helm command succeeds and Argo workloads are ready.
 
-| Setting | What it means |
-| --- | --- |
-| `apiServerIP` | Existing management Kubernetes API; our lab uses `10.220.175.20:6443` |
-| `vipInterface` | Management-node interface carrying tenant VIPs; lab `enp7s0` |
-| `europeVIP` / `asiaVIP` | Reserved floating IPs `.200` / `.203`; never DHCP allocations |
-| `install-dhcp` | Quoted `"no"` uses existing DHCP; quoted `"yes"` installs the DHCP pod |
-| `dhcp.reservations` | Management MAC and reserved IP for each device; fill blanks before enabling DHCP |
+## Step 5 — Save Secrets and apply ONE YAML
 
-**Keep `install-dhcp: "no"` for the first DPF test.** Our existing DHCP still
-serves the lab. To move it into Kubernetes, follow the [DHCP cutover](DHCP.md).
-
-## Step 3 — Apply and check
-
-Run from the directory containing your edited `config.yaml`:
+This can reimage DPUs and restart their attached hosts.
 
 ```bash
-kubectl apply -f config.yaml
-kubectl -n argocd get application dpf-site -w
+bash DPF/bootstrap-credentials.sh --config /tmp/dpf-lab/install.yaml \
+  --bmc-password-file /tmp/dpf-lab/private/bmc-password \
+  --idrac-password-file /tmp/dpf-lab/private/idrac-password \
+  --insecure-bmc && \
+kubectl apply -f /tmp/dpf-lab/install.yaml && \
+kubectl -n argocd get application dpf -w
 ```
 
-Sync starts automatically: DPF configuration first, then Europe and Asia.
-Press Ctrl+C to stop watching; installation continues. Check the result:
+Argo installs **storage, cert-manager, Kamaji, NFD, maintenance operator, DPF,
+Europe/Asia tenants, HBN and DPU provisioning**. No extra stage YAMLs are needed.
+Ctrl+C stops watching; installation continues.
+
+## Step 6 — Verify installation
 
 ```bash
-kubectl -n argocd get application dpf-site -o jsonpath='{.status.operationState.phase}{"\n"}{.status.operationState.message}{"\n"}'
+kubectl -n argocd get application dpf -o jsonpath='{.status.operationState.phase}{"\n"}'
 kubectl get dpuclusters -A
+kubectl -n dpf-operator-system get dpus
+kubectl -n dpf-operator-system get job dpf-bootstrap-ready
 ```
 
-Expect `Succeeded` and two `Ready` tenant clusters. DPUs join in the later
-provisioning stage. If sync fails, read its message before retrying.
+Expected: sync `Succeeded`, both tenants/DPUs `Ready`, readiness Job completed.
+The Job appears at the final stage and checks DPU, tenant and HBN readiness.
+Use the [demo commands](DEMO.txt) to test Ubuntu Internet access and isolation.
+A complete clean rebuild still needs end-to-end testing.
 
-Do not combine `dpf-site` with the older `dpf-operator-config`, `dpf-tenants`, or
-full-stack `dpf` Applications: they own the same resources. The separate
-`dpf-platform` Application from Step 1 is required and compatible.
-
-## Where DHCP is needed
-
-DHCP supplies **DPU management/OOB IPs** before provisioning. Our lab also uses
-reservations for BMCs, iDRACs and Asia's host management NIC. Tenant VIPs are manual.
-`apiServerIP` points to an existing API; this chart does not create a management
-API VIP. For HA, supply an existing load-balanced Kubernetes API endpoint.
-
-Our existing DHCP is dnsmasq (`nico-lab-dhcp`) on `l-ae-1137d`, configuration
-`/etc/nico-lab-dhcp.conf`. Its DHCP server address is `192.168.0.129`.
-The Kubernetes option is disabled until that service and address are migrated.
-See [DHCP settings and NICo differences](DHCP.md).
-
-**Next:** [HBN and DPU provisioning](STAGED-INSTALL.md#7-apply-hbn-networking).
-Create the private BMC Secret using the [credential guide](CREDENTIALS.md) before
-provisioning. [All separate steps](STAGED-INSTALL.md) ·
-[Production settings](PRODUCTION.md) · [Configuration details](CONFIGURATION.md)
-
-## After tenants: HBN and hardware
-
-The public `30-hbn` and `40-provisioning` manifests are **examples**. Before
-syncing them, replace the BMC addresses, serials, node selectors, HBN hostname
-patterns, DNS and IPAM pools with verified site settings. `config.yaml` configures
-the operator and tenant APIs; it does not yet override those hardware settings.
-See the [profile requirements](profiles/two-tenant-hbn/README.md#required-edits).
-
-Both stage directories support Argo `spec.source.kustomize.patches` for local
-Application overrides. Remove `spec.source.directory` when using Kustomize.
-Keep passwords in the BMC Secret and private MAC reservations outside public Git.
-Keep these stages manually synced: provisioning can reimage DPUs.
-
-## Existing Argo — apply the startup fix once
-
-For the package's external Argo release on chart **9.4.1**, keep existing Helm
-settings and add the CRD readiness rule before the next DPF sync:
+If a sync fails, inspect its message before retrying:
 
 ```bash
-helm upgrade external-argo-cd argo/argo-cd \
-  --version 9.4.1 --namespace argocd --reuse-values \
-  -f \
-  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
-  --wait --timeout 10m
+kubectl -n argocd get application dpf -o jsonpath='{.status.operationState.message}{"\n"}'
 ```
 
-This addresses Argo 3.3.0 reporting newly created CRDs as failed before
-`Established=True`. Name conflicts and invalid schemas still report errors.
-An already failed sync remains failed; after this upgrade, use the Step 1 sync
-command once to resume it. No DPF deletion is needed.
-
-## Reinstall external Argo CD
-
-Use this instead of the upgrade above if you want a fresh external Argo install.
-Wait until no Application sync is running. These commands replace only the Helm
-release in `argocd`; they preserve Application CRDs, Applications and DPF resources.
-Do not delete the `argocd` namespace or Argo CRDs.
-
-```bash
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update argo
-helm uninstall external-argo-cd --namespace argocd --wait --timeout 5m
-helm install external-argo-cd argo/argo-cd \
-  --version 9.4.1 \
-  --namespace argocd --create-namespace \
-  --set configs.cm.installationID=dsx-platform \
-  -f \
-  https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
-  --wait --timeout 10m
-kubectl get pods -n argocd
-```
-
-This uses the package's default Argo settings. Custom ingress, SSO or other Helm
-settings must also be supplied when reinstalling. Argo is unavailable during the
-replacement; existing automated Applications can resume when it starts.
-Then return to the Step 1 sync command. Reinstalling Argo alone does not resume
-an already failed manual DPF sync.
+[Passwords](PASSWORDS.md) · [Bash menu](INSTALLER.md) ·
+[DHCP](DHCP.md) · [Platform/tenant alternative](PLATFORM-AND-TENANTS.md) ·
+[Separate YAML stages](STAGED-INSTALL.md) · [Production settings](PRODUCTION.md)

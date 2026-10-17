@@ -5,7 +5,7 @@ This manual workflow is an alternative: do not combine its operator/tenant
 Applications with `dpf-site`.
 
 This is the advanced Git-managed path. For local IP overrides without a fork,
-use the [short guide](README.md). Choose one ownership model per cluster.
+use the [platform/tenant guide](PLATFORM-AND-TENANTS.md). Choose one ownership model per cluster.
 
 ## Before you start
 
@@ -23,7 +23,7 @@ If you already cloned the repository, use that checkout.
 ## 1. Install external Argo with Helm
 
 If external Argo CD is already installed, apply the
-[startup fix once](README.md#existing-argo--apply-the-startup-fix-once) instead.
+[startup fix once](PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once) instead.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm

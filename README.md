@@ -2,25 +2,21 @@
 
 | Directory | Purpose |
 | --- | --- |
-| [DPF](DPF/README.md) | Standalone DPF 26.4.0, prerequisites, and Europe/Asia tenants |
-| [NICo](NICo/README.md) | NICo + DPF integration; planned, not installable yet |
+| [DPF](DPF/README.md) | Standalone DPF, prerequisites, two tenants and HBN |
+| [NICo](NICo/README.md) | NICo + DPF; planned, not installable yet |
 
-**Architecture:** external Argo CD is the shared deployment layer. Keep DPF and
-NICo entry files separate; standalone DPF must work without NICo. Each installed
-resource has one owner. A later NICo integration must define which provisioning
-resources NICo owns before replacing the standalone examples.
+**[Start here: install DPF step by step](DPF/README.md#step-1--get-the-installer).**
 
-**Start here: [DPF installation — Step 1, Step 2, Step 3](DPF/README.md#step-1--external-argo-cd-and-dpf-platform).**
+The prepared lab uses one private Application: `/tmp/dpf-lab/install.yaml`.
+It includes IPs, HBN and hardware settings.
+Passwords and real MACs stay outside Git.
+For another site,
+[prepare its Application](DPF/TWO-COMMAND-INSTALL.md#prepare-a-sites-application-once).
 
-The customer file to edit is **[DPF/config.yaml](DPF/config.yaml)**.
-It contains our lab API/VIPs and marks editable values with `# please change here`.
-Argo reads the Helm templates from Git and uses your local settings.
-Optional DHCP and MAC reservations are in the same file; real lab MACs stay local.
-This file configures the operator and tenants after the platform is installed;
-HBN and hardware provisioning follow separately.
+External Argo is the deployment layer. Each resource has one owner; do not mix
+combined and staged Applications. Standalone DPF does not require NICo.
 
-[Simple DPF diagram](DPF/README.md#how-it-fits-together) ·
-[Where DHCP is needed](DPF/README.md#where-dhcp-is-needed) ·
-[All separate YAML steps](DPF/STAGED-INSTALL.md) ·
-[Passwords outside Git](DPF/CREDENTIALS.md) ·
-[Persistent agent rules](AGENTS.md)
+[Demo commands](DPF/DEMO.txt) · [Passwords](DPF/PASSWORDS.md) ·
+[DHCP](DPF/DHCP.md) · [Separate YAML stages](DPF/STAGED-INSTALL.md) ·
+[Platform/tenant-only config](DPF/PLATFORM-AND-TENANTS.md) ·
+[Agent rules](AGENTS.md)
