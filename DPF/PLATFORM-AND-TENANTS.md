@@ -1,16 +1,7 @@
-# Alternative: platform and tenants
+# Platform and tenant configuration details
 
-For the complete prepared-lab installation, use [the DPF quickstart](README.md).
-
-**Presenting the prepared lab?** Use the [copy-paste TXT demo book](DEMO.txt).
-
-**Full lab reinstall:** use the [Bash menu](INSTALLER.md) to install external
-Argo with Helm, set passwords, and apply one prepared DPF Application. It also
-provides step-by-step actions and a full DPF/prerequisite/Argo cleanup.
-**Passwords and connectivity:** follow [these three short steps](PASSWORDS.md)
-to validate DPU BMC/iDRAC access from a temporary pod before saving Secrets.
-Keep management Kubernetes, Ubuntu hosts, DHCP and fabric. The staged workflow
-below is a separate option; do not apply both.
+Follow the [step-by-step DPF guide](README.md). This page explains the settings
+and external Argo maintenance commands in more detail.
 
 **One file to edit: [config.yaml](config.yaml).** It contains the Kubernetes API,
 tenant VIPs, optional DHCP and MAC reservations. Argo reads the templates from

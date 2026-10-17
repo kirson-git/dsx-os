@@ -1,6 +1,6 @@
 # Separate YAMLs: full installation walkthrough
 
-For the simpler one-file workflow, use [the DPF README](README.md).
+For the settings-file workflow, use [the DPF README](README.md).
 This manual workflow is an alternative: do not combine its operator/tenant
 Applications with `dpf-site`.
 

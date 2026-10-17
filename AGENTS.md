@@ -10,6 +10,10 @@
   after platform installation; optional DHCP uses the same file. HBN and
   provisioning remain separate stages.
 - Keep the README short: numbered steps and a simple diagram; link longer guides.
+- Default to the existing step-by-step workflow with `DPF/config.yaml` as the
+  settings file. Do not redirect users to the combined `install.yaml` or its
+  password wrapper unless they explicitly choose the combined installer.
+  State that HBN/hardware settings remain in separate stage files.
 - Validate YAML rendering, commands, links and Markdown. When publication is
   authorized, commit/push and verify the remote revision before sharing Git links.
 - When the user will run/test the commands, leave deployment to them.
