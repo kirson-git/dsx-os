@@ -4,14 +4,45 @@
 Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
 `install.yaml` is the separate combined installer; do not use it for these steps.
 
+## How DPF brings a DPU online
+
 ```text
 Management Kubernetes (3 nodes)
-  └─ External Argo CD
-      ├─ Prerequisites + DPF
-      ├─ config.yaml → DPF settings + Europe/Asia tenants
-      ├─ HBN networking
-      └─ DPU provisioning
+  │
+  └─ External Argo CD → prerequisites + DPF                 [Step 3]
+       │
+       ├─ Create Europe + Asia tenant control planes        [Step 4]
+       │    config.yaml → DPUCluster (no DPU workers yet)
+       │
+       ├─ Store BMC credentials; prepare HBN definitions    [Steps 5–6]
+       │
+       └─ Register hardware and request provisioning       [Step 7]
+            DPUDevice + DPUNode: BMC IP, serial, credentials
+            │
+            ▼
+          DPF installs the selected BFB + DPUFlavor
+          DPU OS + bundled DOCA software / firmware settings
+            │
+            ▼
+          Required reboot → DPU joins its selected tenant
+            │
+            ├─ Europe DPU → HBN containers → Europe network
+            └─ Asia DPU   → HBN containers → Asia network
 ```
+
+**Create the tenant control planes first; DPUs join after provisioning.**
+Registering hardware lets DPF identify it; registration alone does not install it.
+The selected BFB supplies the DPU OS and its bundled software. Firmware updates
+depend on the bundle and provisioning settings; installing DPF alone does not
+upgrade every firmware component. HBN runs as containers after the DPU joins.
+Step 6 only prepares its definitions. This flow installs the **DPU OS**, not the
+server's Ubuntu OS.
+
+See NVIDIA's [provisioning flow][nvidia-provisioning] and
+[DPUDeployment reference][nvidia-dpudeployment].
+
+[nvidia-provisioning]: https://networking-docs.nvidia.com/dpf/26.4.0/component-description#provisioning-user-flows
+[nvidia-dpudeployment]: https://networking-docs.nvidia.com/dpf/26.4.0/dpudeployment
 
 Requires working Kubernetes, kubectl, Helm and Git. Keep the existing lab DHCP,
 Ubuntu hosts and switch/router configuration. This guide does not install them.
