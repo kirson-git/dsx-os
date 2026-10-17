@@ -1,0 +1,38 @@
+DPF / HBN - EUROPE AND ASIA DEMO
+
+1. On nico-lab: verify both DPUs Ready/Operational, HBN running, and helper Ready.
+kubectl -n dpf-operator-system get dpus
+kubectl -n dpf-operator-system get pod dpf-hbn-recovery-access
+
+2. SSH from nico-lab (server credentials, not BMC credentials).
+Europe:
+ssh -o \
+  'ProxyCommand=kubectl -n dpf-operator-system exec -i dpf-hbn-recovery-access -- nc %h %p' \
+  ubuntu@192.168.0.231
+
+Asia:
+ssh -o \
+  'ProxyCommand=kubectl -n dpf-operator-system exec -i dpf-hbn-recovery-access -- nc %h %p' \
+  root@192.168.0.232
+
+3. In each Ubuntu session: verify address and default route.
+DATA_IF=$(ip -4 route show default | awk '/default/ {print $5; exit}')
+ip -4 addr show dev "$DATA_IF"; ip -4 route show default
+Expected: Asia 10.0.0.1/24; Europe 10.0.0.2/24; gateway 10.0.0.254.
+
+4. Internet via HBN - run on BOTH Ubuntu servers.
+ping -4 -I $DATA_IF -c 3 -W 2 cisco.com
+curl --noproxy '*' --interface $DATA_IF --connect-timeout 5 --max-time 15 \
+  -sS -o /dev/null -w 'HTTP=%{http_code} source=%{local_ip}\n' https://www.cisco.com
+Expect ping replies and HTTPS success with the matching 10.0.0.x source.
+
+5. Cross-tenant ICMP isolation.
+From Europe:
+ping -4 -I $DATA_IF -c 3 -W 2 10.0.0.1
+From Asia:
+ping -4 -I $DATA_IF -c 3 -W 2 10.0.0.2
+Expect 100% packet loss both ways ONLY after Internet checks succeed.
+An absent interface or unfinished installation is not isolation proof.
+
+Monitor: tmux attach -t dpf-monitor
+Guide: https://github.com/kirson-git/dsx-os/blob/main/DPF/README.md

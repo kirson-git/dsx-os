@@ -2,6 +2,8 @@
 
 **Download [config.yaml][raw-config], edit your settings, then apply each stage.**
 Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
+[Download the two-page SSH and HBN demo PDF](user-documentation/DPF-HBN-two-tenant-demo.pdf)
+([copyable commands](user-documentation/DPF-HBN-two-tenant-demo.txt)).
 `install.yaml` is the separate combined installer; do not use it for these steps.
 
 ## How DPF brings a DPU online
