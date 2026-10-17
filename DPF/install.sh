@@ -10,17 +10,21 @@ dsx_bmc_file=''
 dsx_idrac_file=''
 dsx_idrac_user=root
 dsx_probe_args=()
+dsx_cleanup_args=()
 usage() {
   cat <<'EOF'
 Usage: bash DPF/install.sh --config /path/to/install.yaml [--action ACTION]
        [--bmc-password-file PATH] [--idrac-password-file PATH] [--idrac-user USER]
-       [--insecure-bmc]
+       [--insecure-bmc] [--force] [--keep-argo]
 
-Actions: menu (default), config, all, argo, passwords, dpf, status, delete-plan, delete.
+Actions: menu (default), config, all, argo, passwords, dpf, status, delete-plan, delete, delete-force.
 all: install/upgrade external Argo using Helm, create private Secrets, apply the
 single DPF Application. Argo continues asynchronously. No automatic deletion.
 delete: remove this two-tenant DPF stack, dedicated prerequisites and their CRDs,
-then external Argo and its CRDs. Requires typing the current kubectl context.
+then external Argo and its CRDs, unless --keep-argo is supplied.
+--force: terminate active DPF syncs before deletion. Ownership checks and finalizers remain.
+delete-force: shorthand for delete --force --keep-argo.
+Deletion requires typing the current kubectl context; no install config is needed.
 Keeps Kubernetes, Calico/network-policy CRDs, Ubuntu hosts and external networking.
 Requires bash, kubectl, Helm, python3 and PyYAML. Config must be the prepared
 single Application from TWO-COMMAND-INSTALL.md, not the old staged config.yaml.
@@ -44,6 +48,7 @@ while (($#)); do
       shift 2 ;;
     --help|-h) usage; exit 0 ;;
     --insecure-bmc) dsx_probe_args+=(--insecure-bmc); shift ;;
+    --force|--keep-argo) dsx_cleanup_args+=("$1"); shift ;;
     *) fail "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -92,16 +97,21 @@ status() {
   run kubectl -n dpf-operator-system get jobs
 }
 delete_all() {
-  python3 "$dsx_dir/tools/installer.py" delete-plan || return
+  python3 "$dsx_dir/tools/installer.py" delete-plan "${dsx_cleanup_args[@]}" || return
   local context confirmation
   context=$(kubectl config current-context) || return
   [[ -t 0 ]] || { fail 'Full delete needs an interactive terminal for the cluster-name confirmation'; return 1; }
-  printf '\nThis removes DPF, both tenants, their data, dedicated prerequisites and external Argo, including their CRDs.\n'
+  printf '\nThis removes DPF, both tenants, their data and dedicated prerequisites, including their CRDs.\n'
+  if [[ " ${dsx_cleanup_args[*]} " == *' --keep-argo '* ]]; then
+    printf 'External Argo and its CRDs will be KEPT.\n'
+  else
+    printf 'External Argo and its CRDs will also be DELETED.\n'
+  fi
   printf 'Kubernetes and external host/DHCP/router/switch configuration stay.\n'
   printf 'To delete, type the exact context: %s\n' "$context"
   IFS= read -r confirmation
   [[ "$confirmation" == "$context" ]] || { fail 'Context did not match; nothing deleted'; return 1; }
-  python3 "$dsx_dir/tools/installer.py" delete --confirm-context "$confirmation"
+  python3 "$dsx_dir/tools/installer.py" delete --confirm-context "$confirmation" "${dsx_cleanup_args[@]}"
 }
 do_action() {
   case $1 in
@@ -110,8 +120,9 @@ do_action() {
     passwords) set_passwords ;;
     dpf) install_dpf ;;
     status) status ;;
-    delete-plan) python3 "$dsx_dir/tools/installer.py" delete-plan ;;
+    delete-plan) python3 "$dsx_dir/tools/installer.py" delete-plan "${dsx_cleanup_args[@]}" ;;
     delete) delete_all ;;
+    delete-force) (dsx_cleanup_args=(--force --keep-argo); delete_all) ;;
     all)
       show_config || return
       install_argo || return
@@ -135,14 +146,15 @@ DPF installer
   6  Status
   7  Preview full deletion (read only)
   8  Full delete: DPF + prerequisites + Argo + their CRDs
+  9  FORCE DPF cleanup: stop syncs; keep external Argo
   0  Exit
 EOF
   IFS= read -r -p 'Choose: ' dsx_choice || break
   case "$dsx_choice" in
     1) dsx_selected=config ;; 2) dsx_selected=all ;; 3) dsx_selected=argo ;;
     4) dsx_selected=passwords ;; 5) dsx_selected=dpf ;; 6) dsx_selected=status ;;
-    7) dsx_selected=delete-plan ;; 8) dsx_selected=delete ;; 0) break ;;
-    *) printf 'Choose 0–8.\n'; continue ;;
+    7) dsx_selected=delete-plan ;; 8) dsx_selected=delete ;; 9) dsx_selected=delete-force ;; 0) break ;;
+    *) printf 'Choose 0–9.\n'; continue ;;
   esac
   if do_action "$dsx_selected"; then printf 'Command completed.\n'; else printf 'Stopped; inspect %s before retrying.\n' "$dsx_log"; fi
 done

@@ -123,7 +123,7 @@ Enter the shared BMC password at the hidden prompt. It stays outside Git.
 This saves the Secret; it does not test connectivity or change the DPU OS password.
 iDRAC credentials are not used by these manually controlled stages.
 
-## Step 6 — Apply HBN networking
+## Step 6 — Prepare HBN definitions
 
 `config.yaml` covers DPF/tenant/DHCP settings. HBN and hardware have separate
 stage files. **For our lab**, the reviewed local overrides already exist:
@@ -142,7 +142,7 @@ Wait for `Succeeded` / `Synced`, then Ctrl+C. HBN pods run after DPU provisionin
 For a new site, prepare the [HBN and hardware settings](CONFIGURATION.md) first;
 these private lab files are not downloaded by Git clone.
 
-## Step 7 — Provision DPUs, then check status
+## Step 7 — Register and provision DPUs, then check status
 
 **Can reimage DPUs.** Our staged profile retains `nodeEffect.hold: true` and
 external reboot handling. It can pause for manual maintenance/reboot; applying

@@ -122,7 +122,7 @@ def verify_cluster_ownership(apps):
                                '; restore its owning Application before cleanup')
 
 
-def inventory():
+def inventory(force=False, keep_argo=False):
     argo_releases()
     crds = {o['metadata']['name'] for o in objects('crds')}
     apps = objects('applications.argoproj.io') if ARGO_CRDS[0] in crds else []
@@ -132,8 +132,8 @@ def inventory():
             raise RuntimeError('External Argo owns an unrelated Application: ' + meta['name'])
         if meta.get('namespace') not in {'argocd', 'dpf-operator-system'}:
             raise RuntimeError('Another Argo namespace exists; refusing CRD deletion')
-        if app.get('status', {}).get('operationState', {}).get('phase') == 'Running':
-            raise RuntimeError('An Argo sync is running; wait for it to finish before teardown')
+        if sync_active(app) and not force:
+            raise RuntimeError('An Argo sync is pending/running; wait or use --force to terminate it before teardown')
     if ARGO_CRDS[1] in crds and objects('applicationsets.argoproj.io'):
         raise RuntimeError('ApplicationSets exist; review their ownership before teardown')
     allowed_projects = {('argocd', 'default'), ('dpf-operator-system', 'default'),
@@ -171,9 +171,50 @@ def inventory():
             if not ns and (obj['kind'], obj['metadata']['name']) not in defaults:
                 raise RuntimeError('Prerequisite has an unrecognized cluster-scoped instance: ' + crd)
     verify_cluster_ownership(apps)
-    print('Will remove:', len(crds.intersection(platform_crds())), 'DPF/prerequisite CRDs, plus the three Argo CRDs last.')
+    print('Will remove:', len(crds.intersection(platform_crds())), 'DPF/prerequisite CRDs.')
+    print('External Argo and its CRDs: ' + ('KEEP' if keep_argo else 'DELETE LAST'))
+    if force:
+        print('FORCE: disable DPF auto-sync, terminate active syncs, then drain resources. Finalizers and ownership guards remain enforced.')
     print('Will preserve Kubernetes VMs, kube-system, Calico/network-policy CRDs, Ubuntu hosts, DHCP and router/switch configuration.')
     return crds, apps, pvcs
+
+
+def sync_active(app):
+    return bool(app.get('operation')) or app.get('status', {}).get('operationState', {}).get('phase') in {'Running', 'Terminating'}
+
+
+def stop_syncs(timeout=300):
+    """Cancel DPF syncs after disabling auto-sync; never fake completion.
+
+    Argo CD v3.3.0 TerminateOperation sets operationState.phase=Terminating.
+    Resource-version tests reject races with a new controller update.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        active = []
+        for app in objects('applications.argoproj.io'):
+            meta = app['metadata']
+            owned = (meta.get('namespace') == 'argocd' and meta['name'] in APP_NAMES) or meta.get('namespace') == 'dpf-operator-system'
+            if not owned:
+                raise RuntimeError('Unexpected Argo Application appeared during cleanup; stopped')
+            if sync_active(app):
+                active.append(app)
+        if not active:
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Argo sync termination timed out; no DPF resources deleted. Inspect the Argo controller.')
+        for app in active:
+            meta = app['metadata']
+            phase = app.get('status', {}).get('operationState', {}).get('phase')
+            if phase == 'Terminating':
+                continue
+            operations = [{'op': 'test', 'path': '/metadata/resourceVersion', 'value': meta['resourceVersion']}]
+            if phase == 'Running':
+                operations.append({'op': 'replace', 'path': '/status/operationState/phase', 'value': 'Terminating'})
+            elif app.get('operation'):
+                operations.append({'op': 'remove', 'path': '/operation'})
+            kube('-n', meta['namespace'], 'patch', 'application', meta['name'], '--type=json', '-p', json.dumps(operations))
+        time.sleep(2)
 
 
 def wait_empty(resource, namespace=None, timeout=1200):
@@ -196,19 +237,24 @@ def remove_objects(resource, crds, namespace=None):
     wait_empty(resource, namespace)
 
 
-def delete_all(confirm_context):
+def delete_all(confirm_context, force=False, keep_argo=False):
     context = kube('config', 'current-context').strip()
     if confirm_context != context:
         raise RuntimeError('Deletion requires the exact current kubectl context as confirmation')
-    crds, apps, pvcs = inventory()  # Complete read-only guards before first write.
+    crds, apps, pvcs = inventory(force=force, keep_argo=keep_argo)  # Read-only guards before first write.
     for app in apps:
-        if app['metadata']['namespace'] == 'argocd':
-            kube('-n', 'argocd', 'patch', 'application', app['metadata']['name'], '--type=merge', '-p',
+        if app['metadata']['namespace'] == 'argocd' or force:
+            kube('-n', app['metadata']['namespace'], 'patch', 'application', app['metadata']['name'], '--type=merge', '-p',
                  json.dumps({'spec': {'syncPolicy': {'automated': {'enabled': False}}}}))
+    if force and ARGO_CRDS[0] in crds:
+        stop_syncs()
+        crds, apps, pvcs = inventory(keep_argo=keep_argo)
     for step in DELETE_STEPS:
         print('Cleanup stage:', step, flush=True)
         if step == 'hardware':
-            for kind in ['dpudeployments.svc.dpu.nvidia.com', 'dpusets.provisioning.dpu.nvidia.com', 'dpus.provisioning.dpu.nvidia.com']:
+            for kind in ['dpudiscoveries.provisioning.dpu.nvidia.com', 'dpudeployments.svc.dpu.nvidia.com',
+                         'dpusets.provisioning.dpu.nvidia.com', 'dpus.provisioning.dpu.nvidia.com',
+                         'dpunodes.provisioning.dpu.nvidia.com', 'dpudevices.provisioning.dpu.nvidia.com']:
                 remove_objects(kind, crds)
         elif step == 'services':
             for kind in ['dpuservicechains.svc.dpu.nvidia.com', 'dpuservices.svc.dpu.nvidia.com']:
@@ -243,6 +289,9 @@ def delete_all(confirm_context):
                 kube('delete', 'crd', *selected, '--ignore-not-found', '--wait=true', '--timeout=300s')
             kube('delete', 'namespace', *sorted(NAMESPACES), '--ignore-not-found', '--wait=true', '--timeout=600s')
         elif step == 'external-argo':
+            if keep_argo:
+                print('Keeping external Argo, argocd namespace and Argo CRDs.')
+                continue
             # Refuse if a new unrelated Application appeared while cleanup was running.
             if ARGO_CRDS[0] in crds and objects('applications.argoproj.io'):
                 raise RuntimeError('Argo Applications remain; inspect before removing external Argo')
@@ -252,12 +301,14 @@ def delete_all(confirm_context):
             kube('delete', 'namespace', 'argocd', '--ignore-not-found', '--wait=true', '--timeout=300s')
             kube('delete', 'crd', *ARGO_CRDS, '--ignore-not-found', '--wait=true', '--timeout=300s')
     remaining = {o['metadata']['name'] for o in objects('crds')}
-    if remaining.intersection(set(platform_crds()) | set(ARGO_CRDS)):
+    targeted_crds = set(platform_crds()) | (set() if keep_argo else set(ARGO_CRDS))
+    if remaining.intersection(targeted_crds):
         raise RuntimeError('Some targeted CRDs remain')
     leftovers = platform_cluster_resources()
     if leftovers:
         raise RuntimeError('Platform cluster-scoped resources remain: ' + ', '.join(o['kind'] + '/' + o['metadata']['name'] for o in leftovers))
-    print('Scoped DPF/prerequisite/Argo cleanup complete. Management Kubernetes retained.')
+    print('Scoped DPF/prerequisite cleanup complete. Management Kubernetes retained.')
+    print('External Argo: ' + ('retained' if keep_argo else 'removed'))
 
 
 @contextmanager
@@ -289,16 +340,18 @@ def main():
     parser.add_argument('action', choices=['config', 'delete-plan', 'delete'])
     parser.add_argument('--config')
     parser.add_argument('--confirm-context')
+    parser.add_argument('--force', action='store_true', help='Terminate DPF syncs before guarded cleanup; never strip finalizers')
+    parser.add_argument('--keep-argo', action='store_true', help='Keep external Argo, its namespace and CRDs')
     args = parser.parse_args()
     try:
         if args.action == 'config':
             if not args.config: raise ValueError('--config is required')
             show_config(args.config)
-        elif args.action == 'delete-plan': inventory()
+        elif args.action == 'delete-plan': inventory(force=args.force, keep_argo=args.keep_argo)
         else:
             if not args.confirm_context: raise ValueError('--confirm-context is required')
             with pinned_cluster(args.confirm_context):
-                delete_all(args.confirm_context)
+                delete_all(args.confirm_context, force=args.force, keep_argo=args.keep_argo)
     except (RuntimeError, ValueError, KeyError, OSError) as exc:
         parser.exit(1, 'Stopped: ' + str(exc) + '\n')
 

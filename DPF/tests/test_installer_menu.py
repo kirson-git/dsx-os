@@ -159,3 +159,91 @@ class InstallerTests(unittest.TestCase):
                                     env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
             self.assertEqual(log.read_text().splitlines(), ['helm repo add argo https://argoproj.github.io/argo-helm'])
+
+class ForceCleanupTests(unittest.TestCase):
+    def test_force_preview_accepts_running_dpf_sync_without_writes(self):
+        app = {'metadata': {'name': 'dpf', 'namespace': 'argocd'},
+               'operation': {'sync': {}}, 'status': {'operationState': {'phase': 'Running'}}}
+        def objects(resource, namespace=None):
+            if resource == 'crds': return [{'metadata': {'name': 'applications.argoproj.io'}}]
+            if resource == 'applications.argoproj.io': return [app]
+            return []
+        with patch.object(installer, 'objects', side_effect=objects), \
+             patch.object(installer, 'command', return_value='[]'), \
+             patch.object(installer, 'kube') as kube:
+            installer.inventory(force=True, keep_argo=True)
+            kube.assert_not_called()
+            with self.assertRaisesRegex(RuntimeError, 'sync'):
+                installer.inventory()
+
+    def test_force_does_not_bypass_unrelated_application_guard(self):
+        def objects(resource, namespace=None):
+            if resource == 'crds': return [{'metadata': {'name': 'applications.argoproj.io'}}]
+            if resource == 'applications.argoproj.io':
+                return [{'metadata': {'name': 'customer', 'namespace': 'argocd'}}]
+            return []
+        with patch.object(installer, 'objects', side_effect=objects), \
+             patch.object(installer, 'command', return_value='[]'):
+            with self.assertRaisesRegex(RuntimeError, 'unrelated'):
+                installer.inventory(force=True)
+
+    def test_force_terminates_running_and_cancels_pending_sync(self):
+        for phase in ['Running', 'Succeeded']:
+            app = {'metadata': {'name': 'dpf', 'namespace': 'argocd', 'resourceVersion': '123'},
+                   'operation': {'sync': {}}, 'status': {'operationState': {'phase': phase}}}
+            idle = {'metadata': app['metadata'], 'status': {'operationState': {'phase': 'Failed'}}}
+            with self.subTest(phase=phase), \
+                 patch.object(installer, 'objects', side_effect=[[app], [idle]]), \
+                 patch.object(installer, 'kube') as kube, patch.object(installer.time, 'sleep'):
+                installer.stop_syncs(timeout=10)
+                args = kube.call_args.args
+                payload = json.loads(args[-1])
+                self.assertIn('--type=json', args)
+                self.assertEqual(payload[0], {'op': 'test', 'path': '/metadata/resourceVersion', 'value': '123'})
+                if phase == 'Running':
+                    self.assertIn({'op': 'replace', 'path': '/status/operationState/phase', 'value': 'Terminating'}, payload)
+                else:
+                    self.assertIn({'op': 'remove', 'path': '/operation'}, payload)
+
+    def test_force_timeout_stops_before_resource_deletion(self):
+        app = {'metadata': {'name': 'dpf', 'namespace': 'argocd', 'resourceVersion': '123'},
+               'operation': {'sync': {}}, 'status': {'operationState': {'phase': 'Terminating'}}}
+        with patch.object(installer, 'inventory', return_value=(set(installer.ARGO_CRDS), [app], [])), \
+             patch.object(installer, 'objects', return_value=[app]), \
+             patch.object(installer, 'kube', return_value='lab') as kube:
+            with patch.object(installer.time, 'monotonic', side_effect=[0, 301]):
+                with self.assertRaisesRegex(RuntimeError, 'terminat'):
+                    installer.delete_all('lab', force=True)
+            self.assertFalse(any('delete' in c.args for c in kube.call_args_list))
+
+    def test_keep_argo_leaves_release_namespace_and_crds(self):
+        crds = set(installer.ARGO_CRDS)
+        with patch.object(installer, 'inventory', return_value=(crds, [], [])), \
+             patch.object(installer, 'objects', return_value=[{'metadata': {'name': n}} for n in crds]), \
+             patch.object(installer, 'platform_cluster_resources', return_value=[]), \
+             patch.object(installer, 'DELETE_STEPS', ['external-argo']), \
+             patch.object(installer, 'kube', return_value='lab') as kube, \
+             patch.object(installer, 'command') as command:
+            installer.delete_all('lab', keep_argo=True)
+            self.assertFalse(any('delete' in c.args for c in kube.call_args_list))
+            command.assert_not_called()
+
+    def test_hardware_cleanup_removes_inventory_after_dpus(self):
+        kinds = ['dpudiscoveries.provisioning.dpu.nvidia.com', 'dpus.provisioning.dpu.nvidia.com',
+                 'dpunodes.provisioning.dpu.nvidia.com', 'dpudevices.provisioning.dpu.nvidia.com']
+        with patch.object(installer, 'inventory', return_value=(set(kinds), [], [])), \
+             patch.object(installer, 'objects', return_value=[]), \
+             patch.object(installer, 'DELETE_STEPS', ['hardware']), \
+             patch.object(installer, 'kube', return_value='lab'), \
+             patch.object(installer, 'remove_objects') as remove:
+            installer.delete_all('lab')
+            removed = [c.args[0] for c in remove.call_args_list]
+            self.assertTrue(all(k in removed for k in kinds))
+            self.assertLess(removed.index(kinds[0]), removed.index(kinds[1]))
+            self.assertLess(removed.index(kinds[1]), removed.index(kinds[2]))
+            self.assertLess(removed.index(kinds[2]), removed.index(kinds[3]))
+
+    def test_shell_accepts_force_and_keep_argo_without_running_cleanup_for_help(self):
+        result = subprocess.run(['bash', str(ROOT/'install.sh'), '--force', '--keep-argo', '--help'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
