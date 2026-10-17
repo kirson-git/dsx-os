@@ -1,0 +1,4 @@
+apiVersion: v2
+name: nico-kamaji
+version: 1.2.0
+type: application

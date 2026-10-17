@@ -1,6 +1,6 @@
 ---
 name: dsx-dpf-argo
-description: Use when assisting with standalone DPF installation, storage selection, Argo CD sync failures, site configuration, or HBN tenant-network changes in the dsx-os repository. Covers the customer GitOps package; NICo integration is planned separately.
+description: Use when assisting with standalone DPF installation, storage selection, Argo CD sync failures, site configuration, or HBN tenant-network changes in the dsx-os repository. Covers the customer GitOps package; NICo Core integration has a separate profile under NICo/.
 ---
 
 # DSX DPF Argo installation
@@ -140,5 +140,7 @@ success, workload readiness and the requested network/DPU outcome separately.
 User instructions should be short numbered steps with exact copy-paste commands
 and a compact enabled/disabled choice. Link advanced details instead of expanding
 the quick guide. Report what was verified and any remaining blocker.
-NICo is planned, not installable through this package. A full clean rebuild or
+NICo Core has a separate staged package in `NICo/`; it is not enabled by the
+standalone DPF package. Its clean hardware rollout is not yet qualified.
+A full clean rebuild or
 production qualification must not be claimed from offline tests alone.

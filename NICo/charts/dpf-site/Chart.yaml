@@ -1,0 +1,4 @@
+apiVersion: v2
+name: nico-dpf-site
+version: 0.1.0
+type: application

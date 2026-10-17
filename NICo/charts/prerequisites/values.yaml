@@ -1,0 +1,79 @@
+siteName: ''
+namespace: nico-system
+certManagerNamespace: cert-manager
+vaultNamespace: vault
+vaultServiceIP: ''
+esoNamespace: external-secrets
+postgresNamespace: postgres
+clusterApiServer: ''
+vault:
+  address: https://vault.vault.svc.cluster.local:8200
+  namespace: ''
+  token: ''
+  tokenSecret:
+    create: false
+  approleSecret:
+    create: false
+  configJob:
+    enabled: true
+    vaultImage: hashicorp/vault:1.17
+    kubectlImage: alpine/k8s:1.34.1@sha256:ec714df3813b5405292860f8a1c55c5727bf8c33c88992f1e981efad8065547f
+  tls:
+    create: false
+  pkiMount: nicoca
+  pkiRole: nico-cluster
+  nicoCliClientRole:
+    enabled: true
+    name: nico-cli-client
+    ou: ''
+    organization: ''
+  nicoApiK8sAuth:
+    enabled: true
+    serviceAccountName: nico-api
+    tokenTTL: 1h
+  kvMount: secrets
+  kvSeeds: []
+certManager:
+  siteRoot:
+    create: false
+  vaultAuthServiceAccount:
+    create: true
+  vaultIssuer:
+    create: true
+externalSecrets:
+  enabled: true
+sshHostKey:
+  create: false
+azureSSOClientSecret: ''
+azureSSOClientSecretSecret:
+  create: false
+imagePullSecrets:
+  ngcCarbidePull: ''
+  ngcNvidianKey: ''
+rest:
+  enabled: false
+  namespace: nico-rest
+rms:
+  enabled: false
+flow:
+  enabled: false
+  namespace: flow
+temporal:
+  useHaPostgres: false
+keycloak:
+  useHaPostgres: false
+  namespace: nico-rest
+postgresql:
+  enabled: true
+  instances: 3
+  synchronousMode: true
+  volumeSize: 10Gi
+  storageClass: local-path-persistent
+  host: nico-pg-cluster.postgres.svc.cluster.local
+  resources:
+    limits:
+      cpu: '8'
+      memory: 16Gi
+    requests:
+      cpu: '2'
+      memory: 4Gi

@@ -1,0 +1,36 @@
+{{- $v := .Values -}}
+{{- if or (lt (int $v.stage) 1) (gt (int $v.stage) 6) -}}{{ fail "stage must be 1 through 6" }}{{- end -}}
+{{ include "nico.remote" (dict "root" . "name" "nico-cert-manager" "namespace" "cert-manager" "release" "cert-manager" "repo" "https://charts.jetstack.io" "chart" "cert-manager" "version" "v1.17.1" "valuesFile" "cert-manager") }}
+{{ include "nico.remote" (dict "root" . "name" "nico-postgres-operator" "namespace" "postgres" "release" "postgres-operator" "repo" "https://opensource.zalando.com/postgres-operator/charts/postgres-operator" "chart" "postgres-operator" "version" "1.11.0" "valuesFile" "postgres-operator") }}
+{{ include "nico.remote" (dict "root" . "name" "nico-external-secrets" "namespace" "external-secrets" "release" "external-secrets" "repo" "https://charts.external-secrets.io" "chart" "external-secrets" "version" "0.14.3" "valuesFile" "external-secrets") }}
+{{- $monitorSource := dict "repoURL" $v.upstreamRepo "targetRevision" $v.upstreamRevision "path" "helm-prereqs/operators/crds" "directory" (dict "recurse" false "include" "*.yaml") }}
+{{ include "nico.app" (dict "root" . "name" "nico-monitoring-crds" "namespace" "nico-system" "sources" (list $monitorSource)) }}
+{{ if $v.metallb.install }}
+{{ include "nico.remote" (dict "root" . "name" "nico-metallb" "namespace" "metallb-system" "release" "metallb" "repo" "https://metallb.github.io/metallb" "chart" "metallb" "version" "0.14.5") }}
+{{ end }}
+{{ if $v.storage.install }}
+{{ include "nico.local" (dict "root" . "name" "nico-storage" "namespace" "local-path-storage" "path" "NICo/charts/storage" "release" "local-path-provisioner" "values" (dict "storageClass" (dict "name" $v.storage.className))) }}
+{{ end }}
+{{ if ge (int $v.stage) 2 }}
+{{ include "nico.local" (dict "root" . "name" "nico-vault-tls" "namespace" "vault" "path" "NICo/manifests/vault-tls") }}
+{{ include "nico.remote" (dict "root" . "name" "nico-vault" "namespace" "vault" "release" "vault" "repo" "https://helm.releases.hashicorp.com" "chart" "vault" "version" "0.25.0" "valuesFile" "vault" "values" (dict "server" (dict "dataStorage" (dict "storageClass" $v.storage.className) "auditStorage" (dict "storageClass" $v.storage.className)))) }}
+{{ end }}
+{{ if ge (int $v.stage) 3 }}
+{{ include "nico.local" (dict "root" . "name" "nico-prerequisites" "namespace" "nico-system" "path" "NICo/charts/prerequisites" "release" "nico-prereqs" "values" (dict "siteName" $v.site.name "postgresql" (dict "storageClass" $v.storage.className))) }}
+{{ end }}
+{{ if ge (int $v.stage) 4 }}
+{{ include "nico.remote" (dict "root" . "name" "nico-dpf-argo" "namespace" "dpf-operator-system" "release" "argo-cd" "repo" "https://argoproj.github.io/argo-helm" "chart" "argo-cd" "version" "9.4.1" "valuesFile" "argo-cd") }}
+{{ include "nico.local" (dict "root" . "name" "nico-kamaji" "namespace" "dpf-operator-system" "path" "NICo/charts/kamaji" "release" "kamaji" "values" (dict "storageClass" $v.storage.className)) }}
+{{ include "nico.remote" (dict "root" . "name" "nico-maintenance" "namespace" "dpf-operator-system" "release" "maintenance-operator" "repo" "ghcr.io/mellanox" "chart" "maintenance-operator-chart" "version" "0.3.0" "valuesFile" "maintenance-operator") }}
+{{ include "nico.remote" (dict "root" . "name" "nico-nfd" "namespace" "dpf-operator-system" "release" "node-feature-discovery" "repo" "https://kubernetes-sigs.github.io/node-feature-discovery/charts" "chart" "node-feature-discovery" "version" "0.18.3" "valuesFile" "node-feature-discovery") }}
+{{- $operator := dict "repoURL" "https://github.com/NVIDIA/doca-platform.git" "targetRevision" "v26.4.0" "path" "deploy/charts/dpf-operator" "helm" (dict "releaseName" "dpf-operator" "valuesObject" (dict "controllerManager" (dict "image" (dict "repository" "nvcr.io/nvidia/doca/dpf-system" "tag" "v26.4.0")))) }}
+{{ include "nico.app" (dict "root" . "name" "nico-dpf-operator" "namespace" "dpf-operator-system" "sources" (list $operator)) }}
+{{ end }}
+{{ if ge (int $v.stage) 5 }}
+{{ include "nico.local" (dict "root" . "name" "nico-dpf-site" "namespace" "dpf-operator-system" "path" "NICo/charts/dpf-site" "release" "nico-dpf-site" "values" (dict "dpf" $v.dpf "metallb" $v.metallb)) }}
+{{ end }}
+{{ if ge (int $v.stage) 6 }}
+{{- $values := include "nico.coreValues" . | fromYaml -}}
+{{- $core := dict "repoURL" $v.upstreamRepo "targetRevision" $v.upstreamRevision "path" "helm" "helm" (dict "releaseName" "nico" "valuesObject" (mergeOverwrite $values $v.coreExtraValues)) -}}
+{{ include "nico.app" (dict "root" . "name" "nico-core" "namespace" "nico-system" "sources" (list $core)) }}
+{{ end }}

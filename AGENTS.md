@@ -23,7 +23,8 @@
 - **Architecture:** external Argo is shared; DPF and NICo have separate entry files.
   Standalone DPF must work without NICo. Define ownership before NICo integration;
   never manage one resource through overlapping Applications. Keep DPF service
-  Argo separate from external Argo. NICo integration is planned, not implemented.
+  Argo separate from external Argo. NICo Core GitOps is in `NICo/`; read its scope
+  and validation limits before use.
 - Teardown: drain services before tenant APIs; reclaim volumes before storage;
   verify retained CRDs separately. Preserve management Kubernetes and external
   Argo unless their deletion is explicitly requested.

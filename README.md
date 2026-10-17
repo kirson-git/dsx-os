@@ -3,7 +3,7 @@
 | Directory | Purpose |
 | --- | --- |
 | [DPF](DPF/README.md) | Standalone DPF, prerequisites, two tenants and HBN |
-| [NICo](NICo/README.md) | NICo + DPF; planned, not installable yet |
+| [NICo](NICo/README.md) | NICo Core 2.2.2 + DPF; staged GitOps lab-validation profile |
 
 **[Start here: install DPF step by step](DPF/README.md#step-1--get-the-files).**
 

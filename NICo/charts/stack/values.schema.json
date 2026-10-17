@@ -1,0 +1,356 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "repoURL",
+    "revision",
+    "upstreamRepo",
+    "upstreamRevision",
+    "site",
+    "storage",
+    "metallb",
+    "network",
+    "pools",
+    "dpf",
+    "images",
+    "coreExtraValues"
+  ],
+  "properties": {
+    "stage": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "repoURL": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstreamRepo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstreamRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "domain",
+        "apiHostname"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiHostname": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "install",
+        "className"
+      ],
+      "properties": {
+        "install": {
+          "type": "boolean"
+        },
+        "className": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "metallb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "install",
+        "addresses"
+      ],
+      "properties": {
+        "install": {
+          "type": "boolean"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "apiVIP",
+        "dhcpVIP",
+        "pxeVIP",
+        "consoleVIP",
+        "dnsVIPs",
+        "ntpVIPs",
+        "resolverVIP",
+        "upstreamDNS",
+        "upstreamNTP",
+        "fabricCIDRs",
+        "denyCIDRs"
+      ],
+      "properties": {
+        "apiVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dhcpVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pxeVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consoleVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dnsVIPs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "ntpVIPs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "resolverVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstreamDNS": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "upstreamNTP": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fabricCIDRs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "denyCIDRs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "pools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loopback",
+        "vlan",
+        "vni",
+        "vpcVni"
+      ],
+      "properties": {
+        "loopback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "type": "string",
+              "minLength": 1
+            },
+            "end": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "vlan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "type": "integer"
+            },
+            "end": {
+              "type": "integer"
+            }
+          }
+        },
+        "vni": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "type": "integer"
+            },
+            "end": {
+              "type": "integer"
+            }
+          }
+        },
+        "vpcVni": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "type": "integer"
+            },
+            "end": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "dpf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "apiServerIP",
+        "apiServerPort",
+        "dpuVIP",
+        "interface",
+        "controlPlaneLabelValue",
+        "virtualRouterID",
+        "enableIntegration"
+      ],
+      "properties": {
+        "apiServerIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiServerPort": {
+          "type": "integer"
+        },
+        "dpuVIP": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controlPlaneLabelValue": {
+          "type": "string"
+        },
+        "virtualRouterID": {
+          "type": "integer"
+        },
+        "enableIntegration": {
+          "type": "boolean"
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry",
+        "tag",
+        "pullSecret",
+        "dpuChartRepository",
+        "dpuChartVersion",
+        "unboundRepository",
+        "unboundTag",
+        "unboundExporterRepository",
+        "unboundExporterTag"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dpuChartRepository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dpuChartVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unboundRepository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unboundTag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unboundExporterRepository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unboundExporterTag": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "coreExtraValues": {
+      "type": "object"
+    }
+  }
+}

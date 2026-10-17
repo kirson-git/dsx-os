@@ -1,0 +1,102 @@
+# Edit this file locally. No passwords or real MACs belong here.
+# 192.0.2.x / 198.51.100.x are DOCUMENTATION EXAMPLES, not lab allocations.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nico-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: main
+    path: NICo/charts/stack
+    helm:
+      valuesObject:
+        stage: 1
+        repoURL: https://github.com/kirson-git/dsx-os.git
+        revision: main
+        upstreamRepo: https://github.com/dsx-ai-factory/infra-controller.git
+        upstreamRevision: 80d131a5cd3280f9cef3131fa0c5647bdf3e79d0
+        # Please change here: site identity and DNS.
+        site:
+          name: nico-lab
+          domain: nico.example.test
+          apiHostname: api.nico.example.test
+        # Please change here: existing CSI class, or opt into lab local storage.
+        storage:
+          install: false
+          className: local-path
+        # Please change here: reserve these addresses outside DHCP allocation.
+        metallb:
+          install: true
+          addresses:
+          - 192.0.2.30-192.0.2.39
+        # Please change here: routed service VIPs, DHCP relay target and fabric.
+        network:
+          apiVIP: 192.0.2.30
+          dhcpVIP: 192.0.2.31
+          pxeVIP: 192.0.2.32
+          consoleVIP: 192.0.2.33
+          dnsVIPs:
+          - 192.0.2.34
+          - 192.0.2.35
+          ntpVIPs:
+          - 192.0.2.36
+          - 192.0.2.37
+          - 192.0.2.38
+          resolverVIP: 192.0.2.39
+          upstreamDNS:
+          - 1.1.1.1
+          upstreamNTP:
+          - time.cloudflare.com
+          fabricCIDRs:
+          - 198.51.100.0/24
+          denyCIDRs:
+          - 192.0.2.0/24
+        # Please change here: site-approved allocation pools.
+        pools:
+          loopback:
+            start: 198.51.100.10
+            end: 198.51.100.100
+          vlan:
+            start: 100
+            end: 200
+          vni:
+            start: 10000
+            end: 11000
+          vpcVni:
+            start: 20000
+            end: 21000
+        # Please change here: reachable K8s API, reserved DPU VIP and host interface.
+        dpf:
+          apiServerIP: 192.0.2.20
+          apiServerPort: 6443
+          dpuVIP: 192.0.2.40
+          interface: CHANGE_ME
+          controlPlaneLabelValue: ''
+          virtualRouterID: 126
+          enableIntegration: false
+        # Please change here: published images/charts; credentials stay private.
+        images:
+          registry: harbor.runailabs-ps.com/nico
+          tag: v2.2.2
+          pullSecret: imagepullsecret
+          dpuChartRepository: oci://harbor.runailabs-ps.com/nico
+          dpuChartVersion: 2.2.2
+          unboundRepository: CHANGE_ME
+          unboundTag: CHANGE_ME
+          unboundExporterRepository: CHANGE_ME
+          unboundExporterTag: CHANGE_ME
+        coreExtraValues: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true

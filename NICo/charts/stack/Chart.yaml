@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nico-argo-stack
+version: 0.1.0
+appVersion: "2.2.2"
+type: application
+description: Staged NICo Core and DPF Applications for external Argo CD
