@@ -91,3 +91,33 @@ class ImmediateCleanupTests(unittest.TestCase):
                 'kind': 'DPU', 'metadata': {'name': 'asia', 'namespace': 'dpf-operator-system'}})
         self.assertEqual(endpoint, '/apis/provisioning.dpu.nvidia.com/v1alpha1/namespaces/dpf-operator-system/dpus/asia')
         installer.api_resource_names.cache_clear()
+
+    def test_events_are_skipped_without_api_calls(self):
+        for version in ['v1', 'events.k8s.io/v1']:
+            obj = {'kind': 'Event', 'apiVersion': version,
+                   'metadata': {'name': 'old-event', 'namespace': 'dpf-operator-system', 'uid': 'old'}}
+            with self.subTest(version=version), patch.object(installer, 'kube') as kube, \
+                 patch.object(installer, 'command') as command:
+                installer.force_remove('events', obj)
+                kube.assert_not_called()
+                command.assert_not_called()
+
+    def test_object_without_finalizers_is_deleted_without_patch(self):
+        obj = {'kind': 'ConfigMap', 'apiVersion': 'v1',
+               'metadata': {'name': 'config', 'namespace': 'dpf-operator-system', 'uid': 'config-uid'}}
+        with patch.object(installer, 'kube') as kube, \
+             patch.object(installer, 'resource_endpoint', return_value='/api/v1/namespaces/dpf-operator-system/configmaps/config'), \
+             patch.object(installer, 'command') as command:
+            installer.force_remove('configmaps', obj)
+            kube.assert_not_called()
+            self.assertEqual(json.loads(command.call_args.kwargs['input'])['preconditions']['uid'], 'config-uid')
+
+    def test_custom_resource_still_strips_finalizers_added_after_snapshot(self):
+        obj = {'kind': 'DPU', 'apiVersion': 'provisioning.dpu.nvidia.com/v1alpha1',
+               'metadata': {'name': 'asia', 'namespace': 'dpf-operator-system', 'uid': 'dpu'}}
+        with patch.object(installer, 'kube', return_value='') as kube, \
+             patch.object(installer, 'resource_endpoint', return_value='/test/dpu'), \
+             patch.object(installer, 'command'):
+            installer.force_remove('dpus.provisioning.dpu.nvidia.com', obj)
+        self.assertEqual(kube.call_args.args[0], 'patch')
+        self.assertIn({'op': 'add', 'path': '/metadata/finalizers', 'value': []}, json.loads(kube.call_args.args[-1]))

@@ -328,15 +328,19 @@ def force_remove(resource, obj):
         allowed = (kind, name) in {(o['kind'], o['metadata']['name']) for o in platform_objects()}
     if not allowed:
         raise RuntimeError('Refusing force deletion outside scope: ' + kind + '/' + name)
+    if kind == 'Event':
+        return  # Transient records do not gate this forced namespace cleanup.
     scope = ['-n', namespace] if namespace else []
     operations = [{'op': 'test', 'path': '/metadata/uid', 'value': meta['uid']},
                   {'op': 'add', 'path': '/metadata/finalizers', 'value': []}]
-    try:
-        kube('patch', resource, name, *scope, '--type=json', '-p', json.dumps(operations))
-    except RuntimeError:
-        if kube('get', resource, name, *scope, '--ignore-not-found', '-o', 'name').strip():
-            raise
-        return  # Already removed by garbage collection.
+    # DPF/controllers may add finalizers after the snapshot; always strip those.
+    if meta.get('finalizers') or kind not in {'ConfigMap', 'Secret'}:
+        try:
+            kube('patch', resource, name, *scope, '--type=json', '-p', json.dumps(operations))
+        except RuntimeError:
+            if kube('get', resource, name, *scope, '--ignore-not-found', '-o', 'name').strip():
+                raise
+            return  # Already removed by garbage collection.
     # Raw DELETE sends UID preconditions, unlike kubectl delete-by-name. This
     # avoids deleting a replacement created after a terminating object vanished.
     options = {'apiVersion': 'v1', 'kind': 'DeleteOptions', 'gracePeriodSeconds': 0,
@@ -382,7 +386,7 @@ def immediate_delete(confirm_context):
     types = kube('api-resources', '--namespaced=true', '--verbs=list,delete', '-o', 'name').split()
     # Custom resources above are already captured. Core/extension resources
     # include PVCs, Secrets, RBAC, Jobs and controllers, not just kubectl get all.
-    types = [r for r in types if r not in set(platform_crds()) and r != "applications.argoproj.io"]
+    types = [r for r in types if r not in set(platform_crds()) and r not in {"applications.argoproj.io", "events", "events.events.k8s.io"}]
     resources = []
     for namespace in namespaces:
         if types:
