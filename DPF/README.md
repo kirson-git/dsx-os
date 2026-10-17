@@ -1,6 +1,6 @@
 # Install DPF step by step
 
-**Edit [config.yaml](config.yaml) for your settings, then apply each stage.**
+**Download [config.yaml][raw-config], edit your settings, then apply each stage.**
 Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
 `install.yaml` is the separate combined installer; do not use it for these steps.
 
@@ -44,36 +44,38 @@ See NVIDIA's [provisioning flow][nvidia-provisioning] and
 [nvidia-provisioning]: https://networking-docs.nvidia.com/dpf/26.4.0/component-description#provisioning-user-flows
 [nvidia-dpudeployment]: https://networking-docs.nvidia.com/dpf/26.4.0/dpudeployment
 
-Requires working Kubernetes, kubectl, Helm and Git. Keep the existing lab DHCP,
+Requires working Kubernetes, kubectl, Helm, curl and Bash. No Git clone is needed.
+Keep the existing lab DHCP,
 Ubuntu hosts and switch/router configuration. This guide does not install them.
 Use one ownership model: do not run these stages alongside the combined `dpf`
 Application or the older `dpf-operator-config` / `dpf-tenants` Applications.
 
-## Step 1 — Get the files
+## Step 1 — Prepare your local settings directory
 
 ```bash
-test -d /tmp/dsx-os-dpf/.git || \
-  git clone https://github.com/kirson-git/dsx-os.git /tmp/dsx-os-dpf
-cd /tmp/dsx-os-dpf
-git pull --ff-only
+install -d -m 700 /tmp/dpf-lab /tmp/dpf-lab/scripts
 kubectl get nodes
 ```
 
-Expected: management nodes `Ready`. Run the remaining commands from this directory.
+Expected: management nodes `Ready`. Run these commands from any directory.
+Public files use raw GitHub URLs; files you edit stay local.
 
 ## Step 2 — Install external Argo CD
 
 For a new installation:
 
+<!-- rumdl-disable MD013 -->
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm install external-argo-cd argo/argo-cd \
   --version 9.4.1 --namespace argocd --create-namespace \
   --set configs.cm.installationID=dsx-platform \
-  -f DPF/values/external-argo.yaml --wait --timeout 10m
+  -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/values/external-argo.yaml \
+  --wait --timeout 10m
 kubectl -n argocd get pods
 ```
+<!-- rumdl-enable MD013 -->
 
 Already installed? Skip installation; use the
 [existing-release update](PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
@@ -106,13 +108,17 @@ If sync fails, stop and read its message before the next step.
 vi /tmp/dpf-lab/config.yaml
 ```
 
-**New customer:** copy the public template once, then edit it:
+**New customer:** download the public template once, then edit it:
 
+<!-- rumdl-disable MD013 -->
 ```bash
 install -d -m 700 /tmp/dpf-lab
-test -e /tmp/dpf-lab/config.yaml || cp DPF/config.yaml /tmp/dpf-lab/config.yaml
+test -e /tmp/dpf-lab/config.yaml || \
+  curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml \
+    -o /tmp/dpf-lab/config.yaml
 vi /tmp/dpf-lab/config.yaml
 ```
+<!-- rumdl-enable MD013 -->
 
 Edit `spec.source.helm.valuesObject` — these are the variables Argo passes to Helm:
 
@@ -145,10 +151,14 @@ Expected: `Succeeded`, Europe and Asia tenant clusters `Ready`.
 
 ## Step 5 — Set the DPU BMC password
 
+<!-- rumdl-disable MD013 -->
 ```bash
-bash DPF/credentials.sh
+curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
+  -o /tmp/dpf-lab/scripts/credentials.sh && \
+  bash /tmp/dpf-lab/scripts/credentials.sh
 kubectl -n dpf-operator-system get secret bmc-shared-password
 ```
+<!-- rumdl-enable MD013 -->
 
 Enter the shared BMC password at the hidden prompt. It stays outside Git.
 This saves the Secret; it does not test connectivity or change the DPU OS password.
@@ -157,7 +167,9 @@ iDRAC credentials are not used by these manually controlled stages.
 ## Step 6 — Prepare HBN definitions
 
 `config.yaml` covers DPF/tenant/DHCP settings. HBN and hardware have separate
-stage files. **For our lab**, the reviewed local overrides already exist:
+stage files. [Public HBN Application (raw)][raw-hbn].
+**For our lab**, use the reviewed local overrides below; the public example does
+not contain them:
 
 <!-- rumdl-disable MD013 -->
 ```bash
@@ -171,9 +183,12 @@ kubectl -n argocd get application dpf-hbn \
 
 Wait for `Succeeded` / `Synced`, then Ctrl+C. HBN pods run after DPU provisioning.
 For a new site, prepare the [HBN and hardware settings](CONFIGURATION.md) first;
-these private lab files are not downloaded by Git clone.
+these private lab files are not available from a public raw URL.
 
 ## Step 7 — Register and provision DPUs, then check status
+
+[Public provisioning Application (raw)][raw-provisioning]. Our lab uses the local
+file below with its hardware settings; do not replace it with the public example.
 
 **Can reimage DPUs.** Our staged profile retains `nodeEffect.hold: true` and
 external reboot handling. It can pause for manual maintenance/reboot; applying
@@ -207,3 +222,7 @@ Europe `10.0.0.2/24` and Asia `10.0.0.1/24` in the existing lab.
 
 [Public stage templates](STAGED-INSTALL.md) · [Hardware settings](CONFIGURATION.md) ·
 [Production settings](PRODUCTION.md) · [Deletion and recovery](RECOVERY.md)
+
+[raw-config]: https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml
+[raw-hbn]: https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/30-hbn.yaml
+[raw-provisioning]: https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/40-provisioning.yaml
