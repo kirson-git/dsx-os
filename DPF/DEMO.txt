@@ -1,15 +1,8 @@
-DPF + HBN + ZERO TRUST — QUICK LAB DEMO
-Run in Bash on nico-lab as root. This uses the prepared /tmp/dpf-lab files.
-Passwords and local access helpers are not downloaded from Git.
+DPF DEMO — nico-lab, Bash, root
+Uses existing /tmp/dpf-lab files. Working lab? Start at STEP 5.
 
-ALREADY RUNNING? Go straight to STEP 5. No reinstall is needed for the demo.
-
-STEP 1 — PASSWORD FILES
-----------------------
-Both management usernames are root in this BF3 lab.
-DPU BMC:      /tmp/dpf-lab/private/bmc-password
-Server iDRAC: /tmp/dpf-lab/private/idrac-password
-These files are already populated. To enter new passwords without echo/history:
+1. PASSWORDS — already saved; enter again only to change them
+Both BMC/iDRAC users: root. Keep passwords outside Git.
 
 umask 077
 read -r -s -p 'DPU BMC password: ' dpf_password; printf '\n'
@@ -18,103 +11,70 @@ read -r -s -p 'Server iDRAC password: ' dpf_password; printf '\n'
 printf '%s' "$dpf_password" > /tmp/dpf-lab/private/idrac-password; unset dpf_password
 chmod 600 /tmp/dpf-lab/private/bmc-password /tmp/dpf-lab/private/idrac-password
 
-No password belongs in YAML or Git. These are not Ubuntu SSH credentials.
+2. CHECK ACCESS — expect four PASS results; no permanent changes
+Checks BMC/iDRAC credentials and serials, not SSH/DHCP/IPAM.
 
-STEP 2 — CHECK PASSWORDS AND REACHABILITY
----------------------------------------
 bash /tmp/dpf-lab/set-passwords.sh --check-only
 
-Expected: four PASS results — Europe/Asia iDRAC and Europe/Asia DPU BMC.
-The temporary pod checks authenticated Redfish access and device serials.
-It is removed afterward. Permanent Secrets and devices are unchanged.
-This does not test DHCP leases, IPAM, IPMI or Ubuntu SSH.
+3. CONFIG — lab IPs are already filled in
 
-STEP 3 — REVIEW IPs / DHCP IN YOUR ONE APPLICATION
-------------------------------------------------
-python3 /tmp/dsx-os-dpf/DPF/tools/installer.py config --config /tmp/dpf-lab/install.yaml
-
-Edit only if changing settings:
 vi /tmp/dpf-lab/install.yaml
 
-Setting                 Europe             Asia
-Tenant API VIP          192.168.0.200       192.168.0.203
-DPU BMC                 192.168.0.246       192.168.0.249
-Server iDRAC            192.168.0.241       192.168.0.243
-DPU OS management       192.168.0.244       192.168.0.242
-Ubuntu host management  192.168.0.231       192.168.0.232
-Ubuntu data address     10.0.0.2/24         10.0.0.1/24
+                        Europe          Asia
+Tenant VIP              192.168.0.200   192.168.0.203
+DPU BMC                 192.168.0.246   192.168.0.249
+iDRAC                   192.168.0.241   192.168.0.243
+DPU OS (DHCP)           192.168.0.244   192.168.0.242
+Ubuntu management       192.168.0.231   192.168.0.232
+Ubuntu data             10.0.0.2/24     10.0.0.1/24
 
-Management Kubernetes API: 10.220.175.20
-install-dhcp: no — the existing nico-lab-dhcp service supplies DPU OS addresses.
-Tenant VIPs are manually reserved. Host Ubuntu and external networking stay.
-When changing a BMC IP, update its BMC label/selectors in this same YAML too.
-Changing this YAML does not change external DHCP reservations or host netplan.
+API: 10.220.175.20. install-dhcp: no — existing DHCP stays.
+VIPs are manual. BMC IP changes need matching labels/selectors too.
+External DHCP reservations and host netplan are edited separately.
 
-STEP 4 — INSTALL EVERYTHING (CLEAN DPF INSTALL ONLY)
---------------------------------------------------
-Check existing owners first:
+4. INSTALL — clean DPF setup only; can reimage DPUs/reboot hosts
+If the four old dpf-* Applications exist, use RESET first or skip to STEP 5.
+
 kubectl -n argocd get applications
-
-If dpf-platform/dpf-site/dpf-hbn/dpf-provisioning exist, STOP here.
-They already own the stack. Do not apply the combined dpf Application beside them.
-For a working demo, skip to STEP 5. For a clean rebuild, see RESET below.
-If Argo is not installed yet, continue with the install command below.
-
-After cleanup, install external Argo, validate/save Secrets, then apply ONE YAML:
 bash /tmp/dpf-lab/run-installer.sh --action argo
 bash /tmp/dpf-lab/set-passwords.sh
 kubectl apply -f /tmp/dpf-lab/install.yaml
-
-Argo installs: prerequisites -> DPF -> Europe/Asia tenants -> HBN -> DPU provisioning.
-The profile requests Zero Trust mode and handles DPF-requested host reboots.
-It does not install host Ubuntu or recreate external DHCP/switch/router settings.
-
 kubectl -n argocd get application dpf -w
-Press Ctrl+C to stop watching; installation continues.
 
-STEP 5 — SHOW THE WORKING DEMO
------------------------------
-Say: "One management Kubernetes cluster manages two isolated DPU tenants."
+Installs prerequisites -> DPF -> tenants -> HBN -> Zero Trust provisioning.
+Keeps existing host Ubuntu/DHCP/fabric. Ctrl+C stops watching only.
+
+5. DEMO — status and HBN
+
 kubectl -n argocd get applications
 kubectl get dpuclusters -A
 kubectl -n dpf-operator-system get dpus
-
-Show HBN running inside each tenant Kubernetes cluster:
 python3 /tmp/dpf-lab/tenant-run.py europe -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn
 python3 /tmp/dpf-lab/tenant-run.py asia -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn
 
-Say: "Both Ubuntu servers reach the Internet through their own HBN data path."
+Internet through HBN: expect Cisco ping replies and HTTP=200.
 python3 /tmp/dpf-lab/host-run.py europe /tmp/dpf-lab/check-host-network.sh
 python3 /tmp/dpf-lab/host-run.py asia /tmp/dpf-lab/check-host-network.sh
-Expected: Cisco ping succeeds; HTTP=200 with source 10.0.0.2 / 10.0.0.1.
 
-Say: "The addresses share a subnet, but belong to different isolated tenants."
+Data-network isolation: expect cross-tenant ping/SSH blocked and PASS.
 python3 /tmp/dpf-lab/host-run.py europe /tmp/dpf-lab/check-isolation-europe.sh
 python3 /tmp/dpf-lab/host-run.py asia /tmp/dpf-lab/check-isolation-asia.sh
-Expected: own SSH listener succeeds; cross-tenant ping/SSH fail; isolation PASS.
-This isolation test covers the data addresses, not the separate management LAN.
 
-Show saved Zero Trust firmware evidence (captured 2026-10-17; not a live query):
+Saved Zero Trust proof (2026-10-17, not live): expect RESTRICTED.
 cat /tmp/dpf-lab/demo-check-20261017T171259Z/europe-zero-trust.log
 cat /tmp/dpf-lab/demo-check-20261017T171259Z/asia-zero-trust.log
-Expected: RESTRICTED; RShim, tracer, port-owner and counter-read disabled.
-Tenant isolation and firmware host restrictions are separate checks.
 
-IF THE HOST-ACCESS HELPER HAS EXPIRED (it lasts four hours)
---------------------------------------------------------
-This replaces only the temporary access pod. Run before the host demo commands:
+HELPER EXPIRED? Recreate it before host checks:
 kubectl -n dpf-operator-system delete pod dpf-hbn-recovery-access --ignore-not-found --wait=true --timeout=60s
 kubectl apply -f /tmp/dpf-lab/access-pod.yaml
 kubectl -n dpf-operator-system wait pod/dpf-hbn-recovery-access --for=condition=Ready --timeout=120s
 
-RESET — OPTIONAL, DESTRUCTIVE; NOT PART OF THE LIVE DEMO
-------------------------------------------------------
-This removes DPF, tenant state/storage, HBN, dedicated prerequisites, external
-Argo and their CRDs. It interrupts the demo and can trigger hardware cleanup.
-It retains management Kubernetes, host Ubuntu and external networking.
+RESET — DESTRUCTIVE; skip during a live demo
+Deletes DPF/HBN, tenants/storage, prerequisites, external Argo and their CRDs.
+Keeps management Kubernetes, Ubuntu and external networking.
 
 bash /tmp/dpf-lab/run-installer.sh --action delete-plan
 bash /tmp/dpf-lab/run-installer.sh --action delete
 
-Type the exact cluster context when asked. Stop on errors. Then use STEP 4.
-A complete clean rebuild still needs end-to-end validation; a dry-run is not proof.
+Confirm the cluster name. Stop on errors. Continue at STEP 4.
+Full clean rebuild still needs end-to-end testing.
