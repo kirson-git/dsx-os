@@ -126,7 +126,8 @@ Edit these files under `DPF/profiles/two-tenant-hbn/desired/`:
 addresses, hardware identities and network settings before continuing.
 
 ```bash
-bash DPF/credentials.sh
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials
 kubectl -n dpf-operator-system get secret bmc-shared-password
 
 git diff -- DPF/profiles/two-tenant-hbn/desired
@@ -135,7 +136,8 @@ git commit -m "Configure DPF tenants and hardware"
 git push
 ```
 
-The helper prompts for the BMC password privately. Never commit passwords.
+Prepare the [private credential file](CREDENTIALS.md) and replace the example
+BMC IPs. The helper tests every login before saving the Secret. Never commit passwords.
 Argo reads pushed Git changes, not local edits. Your Applications must point to
 the repository and branch receiving these commits (step 2).
 
@@ -234,7 +236,8 @@ settings from step 4. Create the namespace before running the password helper:
 
 ```bash
 kubectl create namespace dpf-operator-system
-bash DPF/credentials.sh
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials
 kubectl apply -f DPF/install.yaml
 kubectl -n argocd get application dpf -w
 ```

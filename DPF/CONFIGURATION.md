@@ -59,11 +59,13 @@ an HBN VTEP and a DPU SSH address are different things.
 Use the Bash helper on the DPF management cluster after the namespace exists:
 
 ```bash
-bash DPF/credentials.sh
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials
 ```
 
-It prompts for the shared BMC password without echo. It changes only the Kubernetes
-Secret, not a DPU or server Linux login. The pinned DPF Redfish implementation
+Read [credential-file setup](CREDENTIALS.md) and replace the example BMC IPs.
+The helper validates all BMC logins from a pod before saving the Kubernetes
+Secret. It does not change a DPU or server Linux login. The pinned DPF Redfish implementation
 selects the BMC account according to its supported platform flow; this Secret is
 not an arbitrary per-device username/password map. Devices needing different
 BMC credentials require a supported design beyond this shared-password example.

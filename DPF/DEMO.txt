@@ -127,15 +127,30 @@ This completes DPF configuration and tenant creation.
 
 Step 5 — Set the DPU BMC password
 
-install -d -m 700 /tmp/dpf-lab/scripts && \
-curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
-  -o /tmp/dpf-lab/scripts/credentials.sh && \
-  bash /tmp/dpf-lab/scripts/credentials.sh
+Use a private file containing two literal lines (no quotes):
+
+username=root
+password=YOUR_BMC_PASSWORD
+
+Our saved lab file is /tmp/dpf-lab/private/bmc-credentials (mode 600).
+For another site, create your own file outside Git and change the IPs/path below.
+Requires Python 3 and permission to create/exec/delete a helper pod.
+
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
+  -o "$HOME/.local/bin/dpf-credentials" && \
+bash "$HOME/.local/bin/dpf-credentials" \
+  --ip 192.168.0.246,192.168.0.249 \
+  --bmc-pass /tmp/dpf-lab/private/bmc-credentials \
+  --node l-ae-1137d-001 --insecure-bmc
 kubectl -n dpf-operator-system get secret bmc-shared-password
 
-Enter the shared BMC password at the hidden prompt. It stays outside Git.
-This saves the Secret; it does not test connectivity or change the DPU OS password.
-iDRAC credentials are not used by these manually controlled stages.
+--ip means DPU BMC addresses. The helper tests every login from Kubernetes
+before saving the Secret; any failed check leaves it unchanged. No password prompt.
+--node selects a management node with network access. --insecure-bmc is for
+our self-signed lab; omit it to verify BMC TLS certificates.
+Optional DPU OS SSH checks use --dpu-ip, --dpu-pass and --ssh-known-hosts;
+see credential-file examples (https://github.com/kirson-git/dsx-os/blob/main/DPF/CREDENTIALS.md). SSH is not required before BFB
+installation. iDRAC credentials are separate.
 
 Step 6 — Prepare HBN definitions
 
@@ -181,25 +196,30 @@ Both DPUs must reach Ready. Then use the demo checks (https://github.com/kirson-
 Ubuntu Internet access and tenant isolation. The host addresses remain
 Europe 10.0.0.2/24 and Asia 10.0.0.1/24 in the existing lab.
 
-Public stage templates (https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md) · Hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/CONFIGURATION.md) ·
-Production settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/PRODUCTION.md) · Deletion and recovery (https://github.com/kirson-git/dsx-os/blob/main/DPF/RECOVERY.md)
-
 Monitor installation in tmux
+
 Requires tmux (sudo apt-get install tmux on Ubuntu).
+
 curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
   -o "$HOME/.local/bin/dpf-monitor" && bash "$HOME/.local/bin/dpf-monitor"
+
 Four visible panes show DPU/BFB status, provisioning logs, service controller
 logs, and events. These are Kubernetes/controller logs; DPU OS consoles and
 HBN container logs inside tenant clusters are not included. The monitor is read
 only and stays running after you detach.
+
 - Select pane: Ctrl+b, then an arrow. Zoom/unzoom: Ctrl+b, then z.
 - Detach: Ctrl+b, then d. Reopen: tmux attach -t dpf-monitor.
 - Controller logs and events are saved under $HOME/dpf-logs/TIMESTAMP/.
   Override with --log-dir /your/directory. Reconnection may repeat recent lines.
 - Stop monitoring/log collection: tmux kill-session -t dpf-monitor.
+
 Run bash "$HOME/.local/bin/dpf-monitor" --help for options. Re-running attaches
 to the existing session and converts old monitor windows into the split view.
 New log settings require a different session name. No split-screen flag is needed.
+
+Public stage templates (https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md) · Hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/CONFIGURATION.md) ·
+Production settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/PRODUCTION.md) · Deletion and recovery (https://github.com/kirson-git/dsx-os/blob/main/DPF/RECOVERY.md)
 
 LIVE DEMO — existing nico-lab helpers only
 

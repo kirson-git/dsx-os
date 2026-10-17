@@ -20,6 +20,7 @@ if 'exec' in a:
  print(json.dumps([{'name':t['name'],'ok':not bool(os.environ.get('PREFLIGHT_FAIL')),'detail':'authentication result'} for t in targets]));sys.exit(0)
 if a[:2]==['delete','namespace']:sys.exit(0)
 if a[:2]==['create','-f']:sys.stdin.read();sys.exit(0)
+if a[:2]==['get','namespace']:sys.exit(0)
 if a[:3]==['get','crd','applications.argoproj.io']:sys.exit(0)
 if 'get' in a and 'applications' in a:
  if os.environ.get('CONFLICT'): print('application.argoproj.io/dpf-site')

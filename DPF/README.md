@@ -151,19 +151,36 @@ Expected: `Succeeded`, Europe and Asia tenant clusters `Ready`.
 
 ## Step 5 — Set the DPU BMC password
 
+Use a private file containing two literal lines (no quotes):
+
+```text
+username=root
+password=YOUR_BMC_PASSWORD
+```
+
+Our saved lab file is `/tmp/dpf-lab/private/bmc-credentials` (mode `600`).
+For another site, create your own file outside Git and change the IPs/path below.
+Requires Python 3 and permission to create/exec/delete a helper pod.
+
 <!-- rumdl-disable MD013 -->
 ```bash
-install -d -m 700 /tmp/dpf-lab/scripts && \
-curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
-  -o /tmp/dpf-lab/scripts/credentials.sh && \
-  bash /tmp/dpf-lab/scripts/credentials.sh
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
+  -o "$HOME/.local/bin/dpf-credentials" && \
+bash "$HOME/.local/bin/dpf-credentials" \
+  --ip 192.168.0.246,192.168.0.249 \
+  --bmc-pass /tmp/dpf-lab/private/bmc-credentials \
+  --node l-ae-1137d-001 --insecure-bmc
 kubectl -n dpf-operator-system get secret bmc-shared-password
 ```
 <!-- rumdl-enable MD013 -->
 
-Enter the shared BMC password at the hidden prompt. It stays outside Git.
-This saves the Secret; it does not test connectivity or change the DPU OS password.
-iDRAC credentials are not used by these manually controlled stages.
+`--ip` means **DPU BMC addresses**. The helper tests every login from Kubernetes
+before saving the Secret; any failed check leaves it unchanged. No password prompt.
+`--node` selects a management node with network access. `--insecure-bmc` is for
+our self-signed lab; omit it to verify BMC TLS certificates.
+Optional DPU OS SSH checks use `--dpu-ip`, `--dpu-pass` and `--ssh-known-hosts`;
+see [credential-file examples](CREDENTIALS.md). SSH is not required before BFB
+installation. iDRAC credentials are separate.
 
 ## Step 6 — Prepare HBN definitions
 

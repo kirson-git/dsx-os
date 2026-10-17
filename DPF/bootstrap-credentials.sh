@@ -104,7 +104,7 @@ if [[ "$dsx_check_only" == true ]]; then
 fi
 printf 'Creating namespace and private password Secrets in the current kubectl cluster.\n'
 kubectl create namespace dpf-operator-system --dry-run=client -o yaml | kubectl apply --server-side --field-manager=dsx-private-credentials -f -
-bash "$dsx_dir/credentials.sh" --password-file "$dsx_private/bmc"
+bash "$dsx_dir/credentials.sh" --skip-check --password-file "$dsx_private/bmc"
 if ! kubectl create secret generic dpf-host-reboot-credentials -n dpf-operator-system \
     --from-file=username="$dsx_private/username" --from-file=password="$dsx_private/password" \
     --dry-run=client -o yaml > "$dsx_private/secret.yaml" 2> "$dsx_private/error"; then

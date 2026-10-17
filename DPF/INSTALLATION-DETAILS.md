@@ -96,13 +96,15 @@ On a clean DPF management cluster, create the namespace and run the helper:
 
 ```bash
 kubectl create namespace dpf-operator-system
-bash DPF/credentials.sh
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials
 ```
 
-Skip namespace creation if it already exists. Type the shared **BMC password**
-at the hidden prompt. The helper creates Kubernetes Secret
+Skip namespace creation if it already exists. Replace the example BMC IPs and
+prepare the [private username/password file](CREDENTIALS.md). The helper tests
+all BMC logins before creating Kubernetes Secret
 `dpf-operator-system/bmc-shared-password`; it does not change a Linux login.
-No password YAML is needed. See [private-file input](CREDENTIALS.md) if preferred.
+No password YAML is committed to Git.
 
 **Site prerequisite:** changing only the BMC IP and password is sufficient only
 when the rest of the profile already matches your site. The clean Git examples

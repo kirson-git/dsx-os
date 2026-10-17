@@ -14,34 +14,79 @@ BMC authentication; verify the supported BMC model and credential state before
 provisioning. See the pinned
 [DPF HBN instructions](https://github.com/NVIDIA/doca-platform/blob/v26.4.0/docs/public/user-guides/zero-trust/use-cases/hbn/README.md).
 
-Select the DPF management cluster and create `dpf-operator-system` if absent
-before the one-file install (or after the separate platform stage). Enter the
-password at the hidden prompt:
+After the platform stage, use a private file with **username and password**:
 
-```bash
-kubectl config current-context
-bash DPF/credentials.sh
+```text
+username=root
+password=YOUR_BMC_PASSWORD
 ```
 
-Alternatively, supply an existing private file outside the checkout:
+Store it outside Git as `/secure/private/bmc-credentials`; set mode `600` or
+`400`. Values are literal: no quotes, comments or shell expansion. Each key must
+appear exactly once; empty values, CR and NUL characters are rejected.
+A final newline is allowed. DPF's shared BMC Secret uses the `root` account.
 
 ```bash
-bash DPF/credentials.sh --password-file /secure/private/bmc-password
+chmod 600 /secure/private/bmc-credentials
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials
 ```
 
-The file must be readable only by its owner (mode 600 or 400), contain the
-password with
-no trailing newline, and remain outside Git. The Bash helper uses a private
-temporary directory outside Git and removes it
-on exit. It passes the Secret through kubectl stdin, does not print the value
-and does not put it in process arguments. It uses server-side apply without force-conflicts;
-another secret manager's ownership conflict must be resolved deliberately.
-The helper changes only the Kubernetes Secret; it does not test BMC authentication.
+Replace the example IPs with **BMC IPs**, not DPU Ubuntu SSH IPs. Supply 1–32 unique
+IPv4 addresses separated by commas without spaces. The script uses the current
+Kubernetes cluster and a temporary host-network pod in `dpf-operator-system`.
+It checks authenticated Redfish access to each BlueField system. Every check must
+pass before it saves `bmc-shared-password`; otherwise the existing Secret stays
+unchanged. This checks login and a BlueField identity response, not an expected
+serial-number match. The helper pod is deleted on exit.
 
-Check existence without displaying the value:
+Requires Bash, Python 3, kubectl, and permission to read the namespace and
+create/exec/delete pods and apply the Secret. The namespace must already exist.
+The helper image is pinned by digest and must be reachable by the cluster.
+
+- `--node NAME`: place the helper on a management node that reaches the BMCs;
+  otherwise Kubernetes schedules it.
+- `--insecure-bmc`: disable BMC TLS verification for self-signed labs only.
+  TLS verification is enabled by default.
+- `--check-only`: test credentials without saving a Secret.
+- `--password-file FILE`: legacy password-only format, root account, no newline;
+  use instead of `--bmc-pass`. Validation still requires `--ip`.
+- `--skip-check`: advanced compatibility path for `bootstrap-credentials.sh`,
+  which already validates credentials and serials. Requires a credential file;
+  cannot be combined with IPs, SSH options or `--check-only`.
+
+### Optional DPU OS SSH check
+
+Use a separate file, also mode `600`/`400`, for the installed DPU OS:
+
+```text
+username=ubuntu
+password=YOUR_DPU_OS_PASSWORD
+```
+
+Supply its **OS IPs** and previously verified SSH host keys:
 
 ```bash
-kubectl get secret bmc-shared-password -n dpf-operator-system
+bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
+  --bmc-pass /secure/private/bmc-credentials \
+  --dpu-ip 192.168.0.11,192.168.0.12 \
+  --dpu-pass /secure/private/dpu-credentials \
+  --ssh-known-hosts /secure/private/known_hosts
+```
+
+All three SSH options are required together. The check runs `true` after login
+and fails on an unknown/changed host key. When SSH checks are requested, they must
+also pass before the BMC Secret is saved. DPU SSH credentials are never saved into
+that Secret. Omit SSH checks before OS provisioning; this helper does not create
+OS accounts, install an OS, test DHCP/IPAM, or reboot anything.
+
+Credentials go to the helper through exec stdin, not command arguments or pod
+specifications. Temporary local files are private and removed on exit. The Secret
+uses server-side apply without forcing ownership conflicts. No account password
+is changed by this helper.
+
+```bash
+kubectl -n dpf-operator-system get secret bmc-shared-password
 ```
 
 ## Git access for external Argo
@@ -80,7 +125,9 @@ Kubernetes Secret data requires cluster RBAC and encryption-at-rest protections;
 base64 encoding is not encryption.
 
 Ubuntu host/DPU SSH credentials, external reboot/iDRAC credentials and tenant
-kubeconfigs also remain private. They are not inputs to the BMC password helper.
+kubeconfigs also remain private. Only optional DPU SSH credentials are inputs to
+this helper; iDRAC and tenant
+kubeconfigs use their separate workflows.
 
 ## External Argo initial login
 
