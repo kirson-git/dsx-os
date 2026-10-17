@@ -59,6 +59,10 @@ This cleanup is scoped to this two-tenant package, not arbitrary Kubernetes apps
 Password prompts are hidden. They ask for the **DPU BMC** password and the shared
 **server iDRAC** password, not Ubuntu login passwords. Both are stored in
 Kubernetes Secrets outside the Application and Git.
+First, a temporary pod validates Redfish credentials and device serials from
+your config. Failures stop Secret creation. For our self-signed lab BMCs, add
+`--insecure-bmc` to the menu/direct command; trusted certificates are the default.
+See [password checks](PASSWORDS.md) for a check-only run and optional OS SSH.
 
 Argo auto-sync continues after the menu exits. Watch it with:
 

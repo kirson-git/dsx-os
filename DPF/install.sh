@@ -9,10 +9,12 @@ dsx_action=menu
 dsx_bmc_file=''
 dsx_idrac_file=''
 dsx_idrac_user=root
+dsx_probe_args=()
 usage() {
   cat <<'EOF'
 Usage: bash DPF/install.sh --config /path/to/install.yaml [--action ACTION]
        [--bmc-password-file PATH] [--idrac-password-file PATH] [--idrac-user USER]
+       [--insecure-bmc]
 
 Actions: menu (default), config, all, argo, passwords, dpf, status, delete-plan, delete.
 all: install/upgrade external Argo using Helm, create private Secrets, apply the
@@ -23,6 +25,8 @@ Keeps Kubernetes, Calico/network-policy CRDs, Ubuntu hosts and external networki
 Requires bash, kubectl, Helm, python3 and PyYAML. Config must be the prepared
 single Application from TWO-COMMAND-INSTALL.md, not the old staged config.yaml.
 Commands and non-secret output are logged under /tmp/dsx-installer.* by default.
+Passwords are validated from a temporary pod before saving Secrets.
+--insecure-bmc disables BMC certificate verification for self-signed lab devices.
 EOF
 }
 fail() { printf 'ERROR: %s\n' "$1" >&2; return 1; }
@@ -39,6 +43,7 @@ while (($#)); do
       esac
       shift 2 ;;
     --help|-h) usage; exit 0 ;;
+    --insecure-bmc) dsx_probe_args+=(--insecure-bmc); shift ;;
     *) fail "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -66,7 +71,7 @@ install_argo() {
     -f "$dsx_dir/values/external-argo.yaml" --wait --timeout 10m
 }
 set_passwords() {
-  local args=(--idrac-user "$dsx_idrac_user")
+  local args=(--config "$dsx_config" --idrac-user "$dsx_idrac_user" "${dsx_probe_args[@]}")
   [[ -z "$dsx_bmc_file" ]] || args+=(--bmc-password-file "$dsx_bmc_file")
   [[ -z "$dsx_idrac_file" ]] || args+=(--idrac-password-file "$dsx_idrac_file")
   bash "$dsx_dir/bootstrap-credentials.sh" "${args[@]}"

@@ -3,6 +3,8 @@
 **Full lab reinstall:** use the [Bash menu](INSTALLER.md) to install external
 Argo with Helm, set passwords, and apply one prepared DPF Application. It also
 provides step-by-step actions and a full DPF/prerequisite/Argo cleanup.
+**Passwords and connectivity:** follow [these three short steps](PASSWORDS.md)
+to validate DPU BMC/iDRAC access from a temporary pod before saving Secrets.
 Keep management Kubernetes, Ubuntu hosts, DHCP and fabric. The staged workflow
 below is a separate option; do not apply both.
 

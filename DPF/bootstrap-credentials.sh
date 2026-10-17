@@ -7,34 +7,53 @@ dsx_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 dsx_bmc_file=''
 dsx_idrac_file=''
 dsx_idrac_user=root
+dsx_config=''
+dsx_check_only=false
+dsx_probe_args=()
 usage() {
   cat <<'EOF'
-Usage: bash DPF/bootstrap-credentials.sh [--bmc-password-file PATH]
+Usage: bash DPF/bootstrap-credentials.sh --config /path/to/install.yaml
+       [--check-only] [--insecure-bmc] [--bmc-password-file PATH]
        [--idrac-password-file PATH] [--idrac-user USER]
 
 For the single-Application clean install with DPF-native host reboot.
-Requires external Argo in the current kubectl cluster; rejects existing staged
-DPF Applications. Creates dpf-operator-system and two private Secrets.
+Requires kubectl, Python 3/PyYAML and management Kubernetes. Validates credentials
+and device serials from temporary pods before saving two private Secrets.
+Normal mode requires external Argo and rejects staged DPF Applications.
+--check-only allows an existing deployment and writes no permanent Secrets.
+--insecure-bmc explicitly disables DPU BMC TLS verification (self-signed labs).
+iDRAC TLS policy and helper-node placement come from bootstrap.hosts in config.
 Missing passwords are read from hidden prompts. Files must be outside Git,
 mode 600/400, nonempty and without newlines. iDRAC user defaults to root.
-Run only after the agreed DPF cleanup. This command does not delete or reboot.
+Optional SSH: --ssh-host IP (repeatable), --ssh-user USER (default ubuntu),
+--ssh-password-file PATH and --ssh-known-hosts PATH (verified keys required).
+Without SSH targets, DPU OS SSH is skipped. IPAM/DHCP/IPMI are not tested.
+Normal mode runs after agreed DPF cleanup. This command does not reboot.
 EOF
 }
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 while (($#)); do
   case $1 in
-    --bmc-password-file|--idrac-password-file|--idrac-user)
+    --config|--bmc-password-file|--idrac-password-file|--idrac-user)
       (($# >= 2)) || fail "$1 needs a value"
       case $1 in
+        --config) dsx_config=$2 ;;
         --bmc-password-file) dsx_bmc_file=$2 ;;
         --idrac-password-file) dsx_idrac_file=$2 ;;
         --idrac-user) dsx_idrac_user=$2 ;;
       esac
       shift 2 ;;
+    --check-only) dsx_check_only=true; shift ;;
+    --insecure-bmc) dsx_probe_args+=(--insecure-bmc); shift ;;
+    --ssh-host|--ssh-user|--ssh-password-file|--ssh-known-hosts)
+      (($# >= 2)) || fail "$1 needs a value"
+      dsx_probe_args+=("$1" "$2"); shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) fail "Unknown argument: $1" ;;
   esac
 done
+[[ -n "$dsx_config" ]] || fail 'Supply --config /path/to/install.yaml for endpoint validation'
+python3 "$dsx_dir/tools/installer.py" config --config "$dsx_config" >/dev/null
 [[ -n "$dsx_idrac_user" && "$dsx_idrac_user" != *:* && "$dsx_idrac_user" != *$'\n'* && "$dsx_idrac_user" != *$'\r'* ]] || fail 'Invalid iDRAC username'
 dsx_root=$(cd -- "$dsx_dir/.." && pwd -P)
 dsx_temp_root=$(cd -- "${TMPDIR:-/tmp}" && pwd -P)
@@ -65,9 +84,24 @@ read_password() {
 read_password "$dsx_bmc_file" 'DPF shared DPU BMC password' "$dsx_private/bmc"
 read_password "$dsx_idrac_file" 'Shared host iDRAC password (Europe and Asia)' "$dsx_private/password"
 printf '%s' "$dsx_idrac_user" > "$dsx_private/username"
-kubectl get crd applications.argoproj.io >/dev/null
-dsx_conflicts=$(kubectl -n argocd get applications dpf-platform dpf-site dpf-hbn dpf-provisioning dpf-operator-config dpf-tenants --ignore-not-found -o name)
-[[ -z "$dsx_conflicts" ]] || fail 'Staged DPF Applications still exist. Complete the agreed cleanup before using the single Application; no changes made.'
+# Keep validation and Secret writes on the same cluster even if another shell
+# changes the user's current context while the helper is running.
+if ! kubectl config view --raw --minify --flatten -o json > "$dsx_private/kubeconfig" 2> "$dsx_private/error"; then
+  fail 'Could not snapshot the current cluster; no changes made'
+fi
+export KUBECONFIG="$dsx_private/kubeconfig"
+if [[ "$dsx_check_only" == false ]]; then
+  kubectl get crd applications.argoproj.io >/dev/null
+  dsx_conflicts=$(kubectl -n argocd get applications dpf-platform dpf-site dpf-hbn dpf-provisioning dpf-operator-config dpf-tenants --ignore-not-found -o name)
+  [[ -z "$dsx_conflicts" ]] || fail 'Staged DPF Applications still exist. Complete the agreed cleanup before using the single Application; no changes made.'
+fi
+python3 "$dsx_dir/tools/preflight.py" --config "$dsx_config" \
+  --bmc-password-file "$dsx_private/bmc" --idrac-password-file "$dsx_private/password" \
+  --idrac-user "$dsx_idrac_user" "${dsx_probe_args[@]}"
+if [[ "$dsx_check_only" == true ]]; then
+  printf 'Credential checks passed. No permanent Secrets were changed.\n'
+  exit 0
+fi
 printf 'Creating namespace and private password Secrets in the current kubectl cluster.\n'
 kubectl create namespace dpf-operator-system --dry-run=client -o yaml | kubectl apply --server-side --field-manager=dsx-private-credentials -f -
 bash "$dsx_dir/credentials.sh" --password-file "$dsx_private/bmc"

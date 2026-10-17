@@ -22,8 +22,10 @@ bash /tmp/dpf-lab/set-passwords.sh
 kubectl apply -f /tmp/dpf-lab/install.yaml
 ```
 
-Command 1 creates the namespace and BMC/iDRAC Secrets from private files outside
-Git. Command 2 starts Argo auto-sync at a pinned Git revision:
+Command 1 checks BMC/iDRAC credentials and device serials from a temporary pod,
+then creates the Secrets from private files outside Git. Failed checks stop it.
+See [passwords and connectivity](PASSWORDS.md), including `--check-only`.
+Command 2 starts Argo auto-sync at a pinned Git revision:
 
 ```text
 Prerequisites → DPF → Europe/Asia tenants → HBN → provision DPUs → readiness check
@@ -73,7 +75,7 @@ shared iDRAC account for this two-host profile; different per-host accounts are
 not implemented. With an interactive terminal, another site can use:
 
 ```bash
-bash DPF/bootstrap-credentials.sh
+bash DPF/bootstrap-credentials.sh --config /path/to/your/install.yaml
 kubectl apply -f /path/to/your/install.yaml
 ```
 

@@ -45,6 +45,13 @@ Do not claim a local edit changes what Argo reads from Git.
   private credential creation, the prepared single Application, status and a
   scoped full teardown. Use `bash DPF/install.sh --config /path/to/install.yaml`.
   `all` submits auto-sync asynchronously; it does not prove provisioning passed.
+  `bootstrap-credentials.sh` requires `--config` and validates BMC/iDRAC
+  credentials plus serials through temporary host-network pods before writing
+  permanent Secrets. `--check-only` permits existing staged Applications and
+  writes no permanent Secrets. Follow [PASSWORDS.md](../../../DPF/PASSWORDS.md).
+  BMC TLS verification defaults on; only the self-signed lab uses explicit
+  `--insecure-bmc`. Optional OS SSH needs separate credentials and verified host
+  keys. Do not equate Redfish success with IPMI, IPAM or DHCP validation.
   `delete-plan` is read only; `delete` needs the exact current context typed.
   Full deletion includes external Argo only when explicitly requested, as here.
   Shared consumers or orphaned platform ownership stop deletion. Never remove
