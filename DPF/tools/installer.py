@@ -29,13 +29,13 @@ def in_scope_namespace(namespace):
     return namespace in NAMESPACES
 
 
-def command(args, capture=True):
+def command(args, capture=True, input=None):
     # No password/Secret commands are routed through this logger.
     print('+ ' + ' '.join(args), flush=True)
-    result = subprocess.run(args, text=True, capture_output=capture)
+    result = subprocess.run(args, text=True, capture_output=capture, input=input)
     if result.returncode:
         if capture and result.stderr: print(result.stderr, file=sys.stderr)
-        raise RuntimeError('Command failed; stopped without forcing finalizers')
+        raise RuntimeError('Command failed; cleanup stopped')
     return result.stdout if capture else ''
 
 
@@ -112,17 +112,17 @@ def platform_cluster_resources():
             if (o['kind'], o['metadata']['name']) in desired]
 
 
-def verify_cluster_ownership(apps):
+def verify_cluster_ownership(apps, allow_orphaned=False):
     app_names = {a['metadata']['name'] for a in apps if a['metadata'].get('namespace') == 'argocd'}
     for obj in platform_cluster_resources():
         annotations = obj['metadata'].get('annotations', {})
         owner = annotations.get('argocd.argoproj.io/tracking-id', '').split(':', 1)[0]
-        if annotations.get('argocd.argoproj.io/installation-id') != 'dsx-platform' or owner not in app_names:
+        if annotations.get('argocd.argoproj.io/installation-id') != 'dsx-platform' or (owner not in app_names and not (allow_orphaned and owner in APP_NAMES)):
             raise RuntimeError('Platform resource is shared or orphaned: ' + obj['kind'] + '/' + obj['metadata']['name'] +
                                '; restore its owning Application before cleanup')
 
 
-def inventory(force=False, keep_argo=False):
+def inventory(force=False, keep_argo=False, allow_orphaned=False):
     argo_releases()
     crds = {o['metadata']['name'] for o in objects('crds')}
     apps = objects('applications.argoproj.io') if ARGO_CRDS[0] in crds else []
@@ -170,11 +170,11 @@ def inventory(force=False, keep_argo=False):
                 raise RuntimeError('Prerequisite resources exist outside the DPF namespaces: ' + crd)
             if not ns and (obj['kind'], obj['metadata']['name']) not in defaults:
                 raise RuntimeError('Prerequisite has an unrecognized cluster-scoped instance: ' + crd)
-    verify_cluster_ownership(apps)
+    verify_cluster_ownership(apps, allow_orphaned=allow_orphaned)
     print('Will remove:', len(crds.intersection(platform_crds())), 'DPF/prerequisite CRDs.')
     print('External Argo and its CRDs: ' + ('KEEP' if keep_argo else 'DELETE LAST'))
     if force:
-        print('FORCE: disable DPF auto-sync, terminate active syncs, then drain resources. Finalizers and ownership guards remain enforced.')
+        print('Active syncs are allowed by this cleanup mode; ownership guards remain enforced.')
     print('Will preserve Kubernetes VMs, kube-system, Calico/network-policy CRDs, Ubuntu hosts, DHCP and router/switch configuration.')
     return crds, apps, pvcs
 
@@ -311,6 +311,125 @@ def delete_all(confirm_context, force=False, keep_argo=False):
     print('External Argo: ' + ('retained' if keep_argo else 'removed'))
 
 
+def force_remove(resource, obj):
+    """Strip finalizers and request immediate deletion, within the package boundary."""
+    meta = obj['metadata']
+    namespace = meta.get('namespace')
+    kind, name = obj['kind'], meta['name']
+    if namespace:
+        allowed = namespace in NAMESPACES or (namespace == 'argocd' and kind == 'Application' and name in APP_NAMES)
+    elif kind == 'Namespace':
+        allowed = name in NAMESPACES
+    elif kind == 'PersistentVolume':
+        allowed = obj.get('spec', {}).get('claimRef', {}).get('namespace') in NAMESPACES
+    elif kind == 'CustomResourceDefinition':
+        allowed = name in platform_crds()
+    else:
+        allowed = (kind, name) in {(o['kind'], o['metadata']['name']) for o in platform_objects()}
+    if not allowed:
+        raise RuntimeError('Refusing force deletion outside scope: ' + kind + '/' + name)
+    scope = ['-n', namespace] if namespace else []
+    operations = [{'op': 'test', 'path': '/metadata/uid', 'value': meta['uid']},
+                  {'op': 'add', 'path': '/metadata/finalizers', 'value': []}]
+    try:
+        kube('patch', resource, name, *scope, '--type=json', '-p', json.dumps(operations))
+    except RuntimeError:
+        if kube('get', resource, name, *scope, '--ignore-not-found', '-o', 'name').strip():
+            raise
+        return  # Already removed by garbage collection.
+    # Raw DELETE sends UID preconditions, unlike kubectl delete-by-name. This
+    # avoids deleting a replacement created after a terminating object vanished.
+    options = {'apiVersion': 'v1', 'kind': 'DeleteOptions', 'gracePeriodSeconds': 0,
+               'propagationPolicy': 'Background', 'preconditions': {'uid': meta['uid']}}
+    try:
+        command(['kubectl', '--request-timeout=30s', 'delete', '--raw', resource_endpoint(obj), '-f', '-'],
+                input=json.dumps(options))
+    except RuntimeError:
+        if kube('get', resource, name, *scope, '--ignore-not-found', '-o', 'name').strip():
+            raise
+
+
+@lru_cache(maxsize=None)
+def api_resource_names(api_version):
+    prefix = '/apis/' + api_version if '/' in api_version else '/api/' + api_version
+    response = json.loads(kube('get', '--raw', prefix))
+    return prefix, {r['kind']: r['name'] for r in response['resources'] if '/' not in r['name']}
+
+
+def resource_endpoint(obj):
+    prefix, names = api_resource_names(obj['apiVersion'])
+    meta = obj['metadata']
+    namespace = '/namespaces/' + meta['namespace'] if meta.get('namespace') else ''
+    return prefix + namespace + '/' + names[obj['kind']] + '/' + meta['name']
+
+
+def resource_type(obj):
+    group = obj['apiVersion'].split('/')[0] if '/' in obj['apiVersion'] else ''
+    return obj['kind'] + ('.' + group if group else '')
+
+
+def immediate_delete(confirm_context):
+    if kube('config', 'current-context').strip() != confirm_context:
+        raise RuntimeError('Cluster context does not match confirmation')
+    crds, apps, _ = inventory(force=True, keep_argo=True, allow_orphaned=True)
+    # Snapshot the scope before removing its Applications/controllers. Do not
+    # print resource bodies: they can include Secrets or private addresses.
+    clusters = platform_cluster_resources()
+    namespaces = [o for o in objects('namespaces') if o['metadata']['name'] in NAMESPACES]
+    volumes = [o for o in objects('pv') if o.get('spec', {}).get('claimRef', {}).get('namespace') in NAMESPACES]
+    selected_crds = [o for o in objects('crds') if o['metadata']['name'] in set(platform_crds())]
+    custom = [o for crd in sorted(crds.intersection(platform_crds())) for o in objects(crd)]
+    types = kube('api-resources', '--namespaced=true', '--verbs=list,delete', '-o', 'name').split()
+    # Custom resources above are already captured. Core/extension resources
+    # include PVCs, Secrets, RBAC, Jobs and controllers, not just kubectl get all.
+    types = [r for r in types if r not in set(platform_crds()) and r != "applications.argoproj.io"]
+    resources = []
+    for namespace in namespaces:
+        if types:
+            resources.extend(objects(','.join(types), namespace['metadata']['name']))
+    print('IMMEDIATE FORCE: stripping scoped finalizers; no controller/completion waits. External Argo stays.')
+    print('This can orphan DPU workloads and backing storage; physical disks are not wiped.')
+    # Detach Argo ownership first. Unlike normal cascade deletion this does not
+    # require Argo or DPF controllers to complete reconciliation.
+    for app in apps:
+        meta = app['metadata']
+        kube('-n', meta['namespace'], 'patch', 'application', meta['name'], '--type=merge', '-p',
+             json.dumps({'metadata': {'annotations': {'argocd.argoproj.io/skip-reconcile': 'true'}},
+                         'spec': {'syncPolicy': {'automated': {'enabled': False}}}, 'operation': None}))
+        force_remove('applications.argoproj.io', app)
+    # Remove admission hooks before stopping the servers that serve them.
+    for obj in clusters:
+        if obj['kind'].endswith('WebhookConfiguration'):
+            force_remove(resource_type(obj), obj)
+    priority = {'CronJob': 0, 'Job': 1, 'Deployment': 2, 'StatefulSet': 2, 'DaemonSet': 2,
+                'ReplicaSet': 3, 'ReplicationController': 3, 'Pod': 4}
+    for obj in sorted(resources, key=lambda o: priority.get(o['kind'], 5)):
+        force_remove(resource_type(obj), obj)
+    for obj in custom:
+        force_remove(resource_type(obj), obj)
+    for obj in volumes:
+        force_remove('pv', obj)
+    for obj in clusters:
+        if not obj['kind'].endswith('WebhookConfiguration'):
+            force_remove(resource_type(obj), obj)
+    for obj in selected_crds:
+        force_remove('crds', obj)
+    for namespace in namespaces:
+        name = namespace['metadata']['name']
+        force_remove('namespace', namespace)
+        current = kube('get', 'namespace', name, '--ignore-not-found', '-o', 'json').strip()
+        if current:
+            remaining = json.loads(current)
+            if remaining['metadata']['uid'] != namespace['metadata']['uid']:
+                raise RuntimeError('Namespace was recreated; refusing to finalize new namespace ' + name)
+            body = {'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {
+                k: remaining['metadata'][k] for k in ['name', 'uid', 'resourceVersion']}, 'spec': {'finalizers': []}}
+            command(['kubectl', '--request-timeout=30s', 'replace', '--raw',
+                     '/api/v1/namespaces/' + name + '/finalize', '-f', '-'], input=json.dumps(body))
+    print('Force-delete requests submitted. No completion waits were performed.')
+    print('Verify remaining namespaces/CRDs before reinstalling; API requests can still take time.')
+
+
 @contextmanager
 def pinned_cluster(expected_context):
     """Freeze the selected cluster for kubectl and Helm; never log credentials."""
@@ -337,7 +456,7 @@ def pinned_cluster(expected_context):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['config', 'delete-plan', 'delete'])
+    parser.add_argument('action', choices=['config', 'delete-plan', 'delete', 'delete-force'])
     parser.add_argument('--config')
     parser.add_argument('--confirm-context')
     parser.add_argument('--force', action='store_true', help='Terminate DPF syncs before guarded cleanup; never strip finalizers')
@@ -351,7 +470,10 @@ def main():
         else:
             if not args.confirm_context: raise ValueError('--confirm-context is required')
             with pinned_cluster(args.confirm_context):
-                delete_all(args.confirm_context, force=args.force, keep_argo=args.keep_argo)
+                if args.action == 'delete-force':
+                    immediate_delete(args.confirm_context)
+                else:
+                    delete_all(args.confirm_context, force=args.force, keep_argo=args.keep_argo)
     except (RuntimeError, ValueError, KeyError, OSError) as exc:
         parser.exit(1, 'Stopped: ' + str(exc) + '\n')
 

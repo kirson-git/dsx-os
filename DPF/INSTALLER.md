@@ -5,38 +5,50 @@ prerequisites, DPF, Europe/Asia tenants, HBN and DPU provisioning.
 This profile retains the existing Ubuntu hosts, DHCP and fabric configuration.
 NICo is a later, separate installation.
 
-## FORCE cleanup for a staged reinstall
+## Immediate FORCE cleanup
 
-No `install.yaml` or password files are needed for deletion:
+**Destructive:** removes DPF/HBN, tenants, their storage objects, dedicated
+prerequisites and their CRDs. Removes finalizers and does not wait for controllers.
+Keeps external Argo and management Kubernetes. Can leave backing storage or
+workloads on physical DPUs; it does not wipe their disks or reset firmware.
+
+Stop an older installer run with **Ctrl+C** before starting this command.
 
 ```bash
-# Preview only; no cluster changes.
+bash DPF/install.sh --action delete-force --yes
+```
+
+On nico-lab:
+
+```bash
+bash /tmp/dpf-lab/run-installer.sh --action delete-force --yes
+```
+
+`--yes` skips confirmation and uses the current kubectl context, pinned for the
+run. Omit it to require typing the context. It is accepted only for `delete-force`.
+Deletion needs no `install.yaml` or passwords. API requests still take time;
+there are no polling loops or waits for deletion to finish. Ownership checks
+still reject unrelated/shared resources. Known orphaned package resources with
+matching Argo tracking IDs can be removed on a retry.
+
+Completion means **delete requests submitted**, not proof that every object is
+gone. Check before reinstalling:
+
+```bash
+kubectl get namespaces
+kubectl get crds
+kubectl -n argocd get applications
+```
+
+For ordinary controller-driven cleanup that preserves finalizers, use:
+
+```bash
 bash DPF/install.sh --action delete-plan --force --keep-argo
-
-# Stop DPF syncs; delete DPF/HBN, tenants, storage and prerequisite CRDs.
-# Keep external Argo and management Kubernetes. Confirm the cluster context.
-bash DPF/install.sh --action delete-force
+bash DPF/install.sh --action delete --force --keep-argo
 ```
 
-On nico-lab, the equivalent local command is:
-
-```bash
-bash /tmp/dpf-lab/run-installer.sh --action delete-force
-```
-
-`--force` disables DPF auto-sync and cancels queued/running syncs before cleanup.
-Termination follows [Argo CD 3.3.0's operation handling](https://github.com/argoproj/argo-cd/blob/v3.3.0/server/application/application.go#L2265).
-It waits up to five minutes for sync termination and stops if the controller
-cannot finish. Resource ownership checks and finalizers remain enforced.
-This deletes Kubernetes configuration and tenant storage; it does not wipe
-DPU disks, reset firmware or remove the retained Ubuntu/DHCP/fabric setup.
-
-To also remove external Argo and its CRDs, use the explicit full-delete command:
-
-```bash
-bash DPF/install.sh --action delete --force
-```
-
+That separate `--force` flag stops active syncs and waits for normal cleanup.
+Omit `--keep-argo` on `delete` to also remove external Argo and its CRDs.
 After cleanup, follow the [settings-file installation steps](README.md).
 The combined-install menu below is a separate option.
 
@@ -74,7 +86,7 @@ bash DPF/install.sh --config /tmp/dpf-lab/install.yaml
 | **6** | Show Kubernetes, Argo, tenant and DPU status |
 | **7** | Preview full deletion; read only |
 | **8** | Delete DPF, dedicated prerequisites, external Argo and their CRDs |
-| **9** | FORCE DPF cleanup: stop syncs first; keep external Argo and its CRDs |
+| **9** | Immediate FORCE: strip scoped finalizers; keep external Argo |
 | **0** | Exit |
 
 For a clean reinstall, choose **7**, then **8**, then **2**. Deletion requires
@@ -87,7 +99,7 @@ restart their attached hosts.
 Deletion stops on unrelated Argo applications/projects, shared prerequisite
 resources, unexpected storage ownership or orphaned platform resources. Restore
 the owning Application before retrying an orphaned installation. A controller
-or finalizer timeout stops cleanup; the script never force-strips finalizers.
+or finalizer timeout stops ordinary cleanup. Only `delete-force` strips finalizers.
 Without `--force`, a queued/running sync also stops cleanup before any writes.
 This cleanup is scoped to this two-tenant package, not arbitrary Kubernetes apps.
 
@@ -127,10 +139,11 @@ bash DPF/install.sh --action delete-plan
 ```
 
 Other `--action` values are `config`, `passwords`, `dpf`, `status`, `delete` and
-`delete-force` and `menu` (default). Deletion always requires an interactive terminal.
+`delete-force` and `menu` (default). Ordinary deletion requires an interactive terminal.
 For `delete` and `delete-plan`, `--force` permits stopping DPF syncs;
 `--keep-argo` preserves external Argo, its namespace and CRDs.
-`delete-force` selects both flags. Preview remains read only even with `--force`.
+`delete-force` is the separate immediate path described above.
+Preview remains read only even with `--force`.
 Optional `--bmc-password-file PATH` and `--idrac-password-file PATH` avoid the
 prompts; files must be outside Git, mode 600/400, with no newline. The iDRAC
 username defaults to `root`; use `--idrac-user USER` to change it.

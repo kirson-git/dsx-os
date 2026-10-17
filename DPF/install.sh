@@ -11,11 +11,12 @@ dsx_idrac_file=''
 dsx_idrac_user=root
 dsx_probe_args=()
 dsx_cleanup_args=()
+dsx_yes=false
 usage() {
   cat <<'EOF'
 Usage: bash DPF/install.sh --config /path/to/install.yaml [--action ACTION]
        [--bmc-password-file PATH] [--idrac-password-file PATH] [--idrac-user USER]
-       [--insecure-bmc] [--force] [--keep-argo]
+       [--insecure-bmc] [--force] [--keep-argo] [--yes]
 
 Actions: menu (default), config, all, argo, passwords, dpf, status, delete-plan, delete, delete-force.
 all: install/upgrade external Argo using Helm, create private Secrets, apply the
@@ -23,8 +24,9 @@ single DPF Application. Argo continues asynchronously. No automatic deletion.
 delete: remove this two-tenant DPF stack, dedicated prerequisites and their CRDs,
 then external Argo and its CRDs, unless --keep-argo is supplied.
 --force: terminate active DPF syncs before deletion. Ownership checks and finalizers remain.
-delete-force: shorthand for delete --force --keep-argo.
-Deletion requires typing the current kubectl context; no install config is needed.
+delete-force: immediate DPF teardown; strips scoped finalizers; no controller waits.
+Keeps external Argo. --yes skips its confirmation prompt. Can orphan storage/DPU workloads.
+Deletion requires confirmation unless delete-force --yes is used. No install config is needed.
 Keeps Kubernetes, Calico/network-policy CRDs, Ubuntu hosts and external networking.
 Requires bash, kubectl, Helm, python3 and PyYAML. Config must be the prepared
 single Application from TWO-COMMAND-INSTALL.md, not the old staged config.yaml.
@@ -48,10 +50,14 @@ while (($#)); do
       shift 2 ;;
     --help|-h) usage; exit 0 ;;
     --insecure-bmc) dsx_probe_args+=(--insecure-bmc); shift ;;
+    --yes) dsx_yes=true; shift ;;
     --force|--keep-argo) dsx_cleanup_args+=("$1"); shift ;;
     *) fail "Unknown argument: $1"; exit 1 ;;
   esac
 done
+if [[ "$dsx_yes" == true && "$dsx_action" != delete-force ]]; then
+  fail '--yes is only supported with --action delete-force'; exit 1
+fi
 for dsx_tool in kubectl helm python3; do
   command -v "$dsx_tool" >/dev/null || { fail "Missing command: $dsx_tool"; exit 1; }
 done
@@ -113,6 +119,18 @@ delete_all() {
   [[ "$confirmation" == "$context" ]] || { fail 'Context did not match; nothing deleted'; return 1; }
   python3 "$dsx_dir/tools/installer.py" delete --confirm-context "$confirmation" "${dsx_cleanup_args[@]}"
 }
+delete_immediate() {
+  local context confirmation
+  context=$(kubectl config current-context) || return
+  printf 'IMMEDIATE FORCE cleanup on %s: DPF, tenants, dedicated prerequisites and CRDs.\n' "$context"
+  printf 'Strips finalizers; keeps external Argo and management Kubernetes. Can orphan DPU workloads/storage.\n'
+  if [[ "$dsx_yes" != true ]]; then
+    [[ -t 0 ]] || { fail 'Use --yes with delete-force for noninteractive deletion'; return 1; }
+    IFS= read -r -p "Type $context to force delete: " confirmation
+    [[ "$confirmation" == "$context" ]] || { fail 'Context did not match; nothing deleted'; return 1; }
+  fi
+  python3 "$dsx_dir/tools/installer.py" delete-force --confirm-context "$context"
+}
 do_action() {
   case $1 in
     config) show_config ;;
@@ -122,7 +140,7 @@ do_action() {
     status) status ;;
     delete-plan) python3 "$dsx_dir/tools/installer.py" delete-plan "${dsx_cleanup_args[@]}" ;;
     delete) delete_all ;;
-    delete-force) (dsx_cleanup_args=(--force --keep-argo); delete_all) ;;
+    delete-force) delete_immediate ;;
     all)
       show_config || return
       install_argo || return
@@ -146,7 +164,7 @@ DPF installer
   6  Status
   7  Preview full deletion (read only)
   8  Full delete: DPF + prerequisites + Argo + their CRDs
-  9  FORCE DPF cleanup: stop syncs; keep external Argo
+  9  IMMEDIATE FORCE: strip DPF finalizers; keep external Argo
   0  Exit
 EOF
   IFS= read -r -p 'Choose: ' dsx_choice || break
