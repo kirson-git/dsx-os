@@ -127,6 +127,7 @@ This completes DPF configuration and tenant creation.
 
 Step 5 — Set the DPU BMC password
 
+install -d -m 700 /tmp/dpf-lab/scripts && \
 curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
   -o /tmp/dpf-lab/scripts/credentials.sh && \
   bash /tmp/dpf-lab/scripts/credentials.sh

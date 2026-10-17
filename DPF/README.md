@@ -153,6 +153,7 @@ Expected: `Succeeded`, Europe and Asia tenant clusters `Ready`.
 
 <!-- rumdl-disable MD013 -->
 ```bash
+install -d -m 700 /tmp/dpf-lab/scripts && \
 curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
   -o /tmp/dpf-lab/scripts/credentials.sh && \
   bash /tmp/dpf-lab/scripts/credentials.sh
