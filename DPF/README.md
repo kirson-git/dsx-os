@@ -232,22 +232,20 @@ curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/mai
 ```
 <!-- rumdl-enable MD013 -->
 
-Four windows show **DPU/BFB status**, **provisioning logs**, **service controller
+Four visible panes show **DPU/BFB status**, **provisioning logs**, **service controller
 logs**, and **events**. These are Kubernetes/controller logs; DPU OS consoles and
 HBN container logs inside tenant clusters are not included. The monitor is read
 only and stays running after you detach.
 
-- Next window: **Ctrl+b**, then **n**.
+- Select pane: **Ctrl+b**, then an arrow. Zoom/unzoom: **Ctrl+b**, then **z**.
 - Detach: **Ctrl+b**, then **d**. Reopen: `tmux attach -t dpf-monitor`.
-- Four panes together instead: use `--panes --session dpf-monitor-panes`.
-  Select a pane with **Ctrl+b**, then an arrow; zoom with **Ctrl+b**, then **z**.
 - Controller logs and events are saved under `$HOME/dpf-logs/TIMESTAMP/`.
   Override with `--log-dir /your/directory`. Reconnection may repeat recent lines.
 - Stop monitoring/log collection: `tmux kill-session -t dpf-monitor`.
-  Use `dpf-monitor-panes` instead if you chose that session.
 
 Run `bash "$HOME/.local/bin/dpf-monitor" --help` for options. Re-running attaches
-to the existing session; new layout/log settings require a different session name.
+to the existing session and converts old monitor windows into the split view.
+New log settings require a different session name. No split-screen flag is needed.
 
 [Public stage templates](STAGED-INSTALL.md) · [Hardware settings](CONFIGURATION.md) ·
 [Production settings](PRODUCTION.md) · [Deletion and recovery](RECOVERY.md)

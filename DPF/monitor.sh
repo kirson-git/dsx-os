@@ -8,8 +8,8 @@ usage() {
 Usage: bash monitor.sh [--panes] [--detach] [--session NAME]
                       [--namespace NAME] [--log-dir DIRECTORY]
 
-Default: attach to four tmux windows in session dpf-monitor.
-  --panes          Show the four views together in a tiled window.
+Default: attach to four visible panes in session dpf-monitor.
+  --panes          Accepted for compatibility; split view is always used.
   --detach         Start without attaching (prints the attach command).
   --session NAME   Session name; letters, digits, underscore and hyphen only.
   --namespace NAME DPF namespace (default: dpf-operator-system).
@@ -18,9 +18,9 @@ Default: attach to four tmux windows in session dpf-monitor.
 
 Views: status, provisioning controller logs, service controller logs, events.
 These are Kubernetes/controller logs, not DPU SSH or serial-console logs.
-Existing sessions are reused; layout/log options apply only to a new session.
+Existing monitor windows are joined into a split view; log options apply to new sessions.
 Uses the current Kubernetes context, pinned when the session starts.
-Detach: Ctrl+b then d. Next window: Ctrl+b then n. Zoom pane: Ctrl+b then z.
+Detach: Ctrl+b then d. Select pane: Ctrl+b then arrow. Zoom: Ctrl+b then z.
 Stop the monitor: tmux kill-session -t dpf-monitor (or your chosen session name).
 HELP
 }
@@ -68,13 +68,12 @@ fi
 
 session=dpf-monitor
 namespace=dpf-operator-system
-layout=windows
 detach=false
 log_dir=''
 while (($#)); do
   case "$1" in
     --help|-h) usage; exit 0 ;;
-    --panes) layout=panes; shift ;;
+    --panes) shift ;;
     --detach) detach=true; shift ;;
     --session|--namespace|--log-dir)
       [[ $# -ge 2 && -n $2 ]] || { printf 'Missing value for %s\n' "$1" >&2; exit 2; }
@@ -110,13 +109,9 @@ if [[ -z $session_id ]]; then
   tmux set-option -t "$session_id" default-shell "$(command -v bash)"
   tmux respawn-pane -k -t "$first" "$(worker status)"
   for view in provisioning services events; do
-    if [[ $layout == panes ]]; then
-      pane=$(tmux split-window -d -P -F '#{pane_id}' -t "$first" "$(worker "$view")")
-      tmux select-pane -t "$pane" -T "$view"
-      tmux select-layout -t "$first" tiled >/dev/null
-    else
-      tmux new-window -d -t "$session_id:" -n "$view" "$(worker "$view")"
-    fi
+    pane=$(tmux split-window -d -P -F '#{pane_id}' -t "$first" "$(worker "$view")")
+    tmux select-pane -t "$pane" -T "$view"
+    tmux select-layout -t "$first" tiled >/dev/null
   done
   tmux select-pane -t "$first" -T status
   tmux set-option -w -t "$first" pane-border-status top
@@ -124,6 +119,31 @@ if [[ -z $session_id ]]; then
   trap - ERR
   printf 'Log directory: %s\n' "$log_dir"
 fi
+# Preserve running log streams when upgrading an older four-window session.
+mapfile -t panes < <(tmux list-panes -s -t "$session_id" -F '#{pane_id}|#{pane_start_command}')
+[[ ${#panes[@]} == 4 ]] || { echo 'Expected four monitor panes; choose another --session name.' >&2; exit 1; }
+first=''
+for entry in "${panes[@]}"; do
+  [[ $entry == *'--view '* ]] || { echo 'Session contains non-monitor panes; choose another --session name.' >&2; exit 1; }
+  if [[ $entry == *'--view status '* ]]; then first=${entry%%|*}; fi
+done
+[[ -n $first ]] || { echo 'Monitor status pane missing; choose another --session name.' >&2; exit 1; }
+window=$(tmux display-message -p -t "$first" '#{window_id}')
+for entry in "${panes[@]}"; do
+  pane=${entry%%|*}
+  if [[ $(tmux display-message -p -t "$pane" '#{window_id}') != "$window" ]]; then
+    tmux join-pane -d -s "$pane" -t "$first"
+    tmux select-layout -t "$first" tiled >/dev/null
+  fi
+done
+if [[ $(tmux display-message -p -t "$first" '#{window_zoomed_flag}') == 1 ]]; then
+  tmux resize-pane -Z -t "$first"
+fi
+tmux select-layout -t "$first" tiled >/dev/null
+tmux set-option -w -t "$first" pane-border-status top
+tmux set-option -w -t "$first" pane-border-format '#{pane_title}'
+tmux select-window -t "$window"
+tmux select-pane -t "$first"
 printf 'Attach: tmux attach -t %s\n' "$session"
 if [[ $detach == false ]]; then
   if [[ -n ${TMUX:-} ]]; then
