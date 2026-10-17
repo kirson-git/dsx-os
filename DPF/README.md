@@ -221,6 +221,36 @@ Both DPUs must reach `Ready`. Then use the [demo checks](DEMO.txt) for HBN,
 Ubuntu Internet access and tenant isolation. The host addresses remain
 Europe `10.0.0.2/24` and Asia `10.0.0.1/24` in the existing lab.
 
+## Monitor installation in tmux
+
+Requires `tmux` (`sudo apt-get install tmux` on Ubuntu).
+
+<!-- rumdl-disable MD013 -->
+```bash
+install -d -m 700 /tmp/dpf-lab/scripts && \
+curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
+  -o /tmp/dpf-lab/scripts/monitor.sh && \
+bash /tmp/dpf-lab/scripts/monitor.sh
+```
+<!-- rumdl-enable MD013 -->
+
+Four windows show **DPU/BFB status**, **provisioning logs**, **service controller
+logs**, and **events**. These are Kubernetes/controller logs; DPU OS consoles and
+HBN container logs inside tenant clusters are not included. The monitor is read
+only and stays running after you detach.
+
+- Next window: **Ctrl+b**, then **n**.
+- Detach: **Ctrl+b**, then **d**. Reopen: `tmux attach -t dpf-monitor`.
+- Four panes together instead: use `--panes --session dpf-monitor-panes`.
+  Select a pane with **Ctrl+b**, then an arrow; zoom with **Ctrl+b**, then **z**.
+- Controller logs and events are saved under `$HOME/dpf-logs/TIMESTAMP/`.
+  Override with `--log-dir /your/directory`. Reconnection may repeat recent lines.
+- Stop monitoring/log collection: `tmux kill-session -t dpf-monitor`.
+  Use `dpf-monitor-panes` instead if you chose that session.
+
+Run `bash /tmp/dpf-lab/scripts/monitor.sh --help` for options. Re-running attaches
+to the existing session; new layout/log settings require a different session name.
+
 [Public stage templates](STAGED-INSTALL.md) · [Hardware settings](CONFIGURATION.md) ·
 [Production settings](PRODUCTION.md) · [Deletion and recovery](RECOVERY.md)
 
