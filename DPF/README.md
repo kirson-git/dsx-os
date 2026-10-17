@@ -56,7 +56,7 @@ DPF and DPF's separate service Argo. To reuse existing storage, follow the
 
 <!-- rumdl-disable MD013 -->
 ```bash
-kubectl apply -f DPF/generated/applications/00-platform.yaml
+kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml
 kubectl -n argocd patch application dpf-platform --type merge \
   -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
 kubectl -n argocd get application dpf-platform \
