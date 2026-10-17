@@ -227,10 +227,8 @@ Requires `tmux` (`sudo apt-get install tmux` on Ubuntu).
 
 <!-- rumdl-disable MD013 -->
 ```bash
-install -d -m 700 /tmp/dpf-lab/scripts && \
-curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
-  -o /tmp/dpf-lab/scripts/monitor.sh && \
-bash /tmp/dpf-lab/scripts/monitor.sh
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
+  -o "$HOME/.local/bin/dpf-monitor" && bash "$HOME/.local/bin/dpf-monitor"
 ```
 <!-- rumdl-enable MD013 -->
 
@@ -248,7 +246,7 @@ only and stays running after you detach.
 - Stop monitoring/log collection: `tmux kill-session -t dpf-monitor`.
   Use `dpf-monitor-panes` instead if you chose that session.
 
-Run `bash /tmp/dpf-lab/scripts/monitor.sh --help` for options. Re-running attaches
+Run `bash "$HOME/.local/bin/dpf-monitor" --help` for options. Re-running attaches
 to the existing session; new layout/log settings require a different session name.
 
 [Public stage templates](STAGED-INSTALL.md) · [Hardware settings](CONFIGURATION.md) ·
