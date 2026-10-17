@@ -1,5 +1,7 @@
 # Install DPF with Argo CD
 
+**Presenting the prepared lab?** Use the [copy-paste TXT demo book](DEMO.txt).
+
 **Full lab reinstall:** use the [Bash menu](INSTALLER.md) to install external
 Argo with Helm, set passwords, and apply one prepared DPF Application. It also
 provides step-by-step actions and a full DPF/prerequisite/Argo cleanup.
