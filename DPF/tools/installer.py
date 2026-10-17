@@ -311,6 +311,34 @@ def delete_all(confirm_context, force=False, keep_argo=False):
     print('External Argo: ' + ('retained' if keep_argo else 'removed'))
 
 
+def is_runtime_dpf_webhook(obj):
+    # Created by the DPF operator after platform installation, so absent from
+    # generated/platform. Match exact identity, component and every backend.
+    allowed = {
+        ('ValidatingWebhookConfiguration', 'dpf-provisioning-validating-webhook-configuration'):
+            ('dpf-provisioning-controller-manager', 'dpf-provisioning-webhook-service'),
+        ('MutatingWebhookConfiguration', 'dpf-provisioning-mutating-webhook-configuration'):
+            ('dpf-provisioning-controller-manager', 'dpf-provisioning-webhook-service'),
+        ('ValidatingWebhookConfiguration', 'dpuservice-validating-webhook-configuration'):
+            ('dpuservice-controller-manager', 'dpuservice-webhook-service'),
+    }
+    meta = obj['metadata']
+    expected = allowed.get((obj['kind'], meta['name']))
+    if not expected or meta.get('labels', {}).get('dpu.nvidia.com/component') != expected[0]:
+        return False
+    hooks = obj.get('webhooks', [])
+    return bool(hooks) and all(
+        not h.get('clientConfig', {}).get('url') and
+        h.get('clientConfig', {}).get('service', {}).get('namespace') == 'dpf-operator-system' and
+        h.get('clientConfig', {}).get('service', {}).get('name') == expected[1]
+        for h in hooks)
+
+
+def runtime_dpf_webhooks():
+    return [o for o in objects('validatingwebhookconfigurations,mutatingwebhookconfigurations')
+            if is_runtime_dpf_webhook(o)]
+
+
 def force_remove(resource, obj):
     """Strip finalizers and request immediate deletion, within the package boundary."""
     meta = obj['metadata']
@@ -324,6 +352,8 @@ def force_remove(resource, obj):
         allowed = obj.get('spec', {}).get('claimRef', {}).get('namespace') in NAMESPACES
     elif kind == 'CustomResourceDefinition':
         allowed = name in platform_crds()
+    elif is_runtime_dpf_webhook(obj):
+        allowed = True
     else:
         allowed = (kind, name) in {(o['kind'], o['metadata']['name']) for o in platform_objects()}
     if not allowed:
@@ -378,7 +408,7 @@ def immediate_delete(confirm_context):
     crds, apps, _ = inventory(force=True, keep_argo=True, allow_orphaned=True)
     # Snapshot the scope before removing its Applications/controllers. Do not
     # print resource bodies: they can include Secrets or private addresses.
-    clusters = platform_cluster_resources()
+    clusters = platform_cluster_resources() + runtime_dpf_webhooks()
     namespaces = [o for o in objects('namespaces') if o['metadata']['name'] in NAMESPACES]
     volumes = [o for o in objects('pv') if o.get('spec', {}).get('claimRef', {}).get('namespace') in NAMESPACES]
     selected_crds = [o for o in objects('crds') if o['metadata']['name'] in set(platform_crds())]

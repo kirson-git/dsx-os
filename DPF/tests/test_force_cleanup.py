@@ -121,3 +121,20 @@ class ImmediateCleanupTests(unittest.TestCase):
             installer.force_remove('dpus.provisioning.dpu.nvidia.com', obj)
         self.assertEqual(kube.call_args.args[0], 'patch')
         self.assertIn({'op': 'add', 'path': '/metadata/finalizers', 'value': []}, json.loads(kube.call_args.args[-1]))
+
+    def test_runtime_dpf_webhook_is_removed_but_foreign_backend_is_rejected(self):
+        obj = {'kind': 'ValidatingWebhookConfiguration', 'apiVersion': 'admissionregistration.k8s.io/v1',
+               'metadata': {'name': 'dpf-provisioning-validating-webhook-configuration', 'uid': 'hook',
+                            'labels': {'dpu.nvidia.com/component': 'dpf-provisioning-controller-manager'}},
+               'webhooks': [{'clientConfig': {'service': {'name': 'dpf-provisioning-webhook-service',
+                                                          'namespace': 'dpf-operator-system'}}}]}
+        with patch.object(installer, 'kube', return_value=''), \
+             patch.object(installer, 'resource_endpoint', return_value='/test/hook'), \
+             patch.object(installer, 'command') as command:
+            installer.force_remove('validatingwebhookconfigurations', obj)
+            self.assertEqual(json.loads(command.call_args.kwargs['input'])['preconditions']['uid'], 'hook')
+            command.reset_mock()
+            obj['webhooks'][0]['clientConfig']['service']['namespace'] = 'other'
+            with self.assertRaisesRegex(RuntimeError, 'scope'):
+                installer.force_remove('validatingwebhookconfigurations', obj)
+            command.assert_not_called()
