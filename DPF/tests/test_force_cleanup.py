@@ -138,3 +138,35 @@ class ImmediateCleanupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'scope'):
                 installer.force_remove('validatingwebhookconfigurations', obj)
             command.assert_not_called()
+
+    def test_namespace_ca_configmap_is_left_to_namespace_cleanup(self):
+        # The namespace controller recreates this object with a new UID after
+        # deletion. It must not stop the teardown before namespace deletion.
+        obj = {'kind': 'ConfigMap', 'apiVersion': 'v1',
+               'metadata': {'name': 'kube-root-ca.crt', 'namespace': 'local-path-provisioner',
+                            'uid': 'old-ca-uid'}}
+        with patch.object(installer, 'kube') as kube, \
+             patch.object(installer, 'command') as command:
+            with patch.object(installer, 'resource_endpoint', return_value='/test/ca'):
+                installer.force_remove('ConfigMap', obj)
+            kube.assert_not_called()
+            command.assert_not_called()
+
+    def test_namespace_ca_exception_does_not_bypass_scope(self):
+        obj = {'kind': 'ConfigMap', 'apiVersion': 'v1',
+               'metadata': {'name': 'kube-root-ca.crt', 'namespace': 'kube-system', 'uid': 'ca'}}
+        with patch.object(installer, 'kube') as kube, \
+             patch.object(installer, 'command') as command:
+            with self.assertRaisesRegex(RuntimeError, 'scope'):
+                installer.force_remove('ConfigMap', obj)
+            kube.assert_not_called()
+            command.assert_not_called()
+
+    def test_recreated_user_configmap_still_stops_on_uid_conflict(self):
+        obj = {'kind': 'ConfigMap', 'apiVersion': 'v1',
+               'metadata': {'name': 'user-config', 'namespace': 'dpf-operator-system', 'uid': 'old'}}
+        with patch.object(installer, 'kube', return_value='configmap/user-config'), \
+             patch.object(installer, 'resource_endpoint', return_value='/test/config'), \
+             patch.object(installer, 'command', side_effect=RuntimeError('UID conflict')):
+            with self.assertRaisesRegex(RuntimeError, 'UID conflict'):
+                installer.force_remove('ConfigMap', obj)

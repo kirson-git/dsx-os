@@ -360,6 +360,10 @@ def force_remove(resource, obj):
         raise RuntimeError('Refusing force deletion outside scope: ' + kind + '/' + name)
     if kind == 'Event':
         return  # Transient records do not gate this forced namespace cleanup.
+    if kind == 'ConfigMap' and obj.get('apiVersion') == 'v1' and name == 'kube-root-ca.crt':
+        # Kubernetes recreates this automatic namespace CA with a new UID.
+        # Let namespace deletion remove it instead of racing that controller.
+        return
     scope = ['-n', namespace] if namespace else []
     operations = [{'op': 'test', 'path': '/metadata/uid', 'value': meta['uid']},
                   {'op': 'add', 'path': '/metadata/finalizers', 'value': []}]
