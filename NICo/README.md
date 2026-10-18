@@ -1,5 +1,10 @@
 # NICo + DPF through Argo CD
 
+**New installation plan:** [Argo-managed DPF + NVIDIA setup.sh (PDF)](user-documentation/NICo-DPF-Argo-installation-plan.pdf)
+([copyable text](user-documentation/NICo-DPF-Argo-installation-plan.txt)).
+This split is still being planned. The all-Argo package below is a different
+ownership model; do not combine it with `setup.sh` on the same resources.
+
 **Edit one file:** [config.yaml](config.yaml). Keep passwords outside Git.
 
 This package stages **NICo Core 2.2.2 + DPF v26.4.0** on a clean Kubernetes
