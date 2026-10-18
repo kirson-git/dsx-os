@@ -1,0 +1,26 @@
+# External Argo only. Keep the Helm chart defaults and wait for CRD establishment.
+# Argo 3.3.0's bundled check reports Degraded during normal CRD startup.
+configs:
+  cm:
+    resource.customizations.health.apiextensions.k8s.io_CustomResourceDefinition: |
+      local conditions = (obj.status or {}).conditions or {}
+      if (obj.metadata or {}).deletionTimestamp ~= nil then
+        return {status = "Progressing", message = "Waiting for CRD deletion"}
+      end
+      for _, condition in ipairs(conditions) do
+        if condition.type == "Terminating" and condition.status == "True" then
+          return {status = "Progressing", message = "Waiting for CRD deletion"}
+        end
+      end
+      for _, condition in ipairs(conditions) do
+        if (condition.type == "NamesAccepted" and condition.status == "False") or
+           (condition.type == "NonStructuralSchema" and condition.status == "True") then
+          return {status = "Degraded", message = condition.message or condition.reason or condition.type}
+        end
+      end
+      for _, condition in ipairs(conditions) do
+        if condition.type == "Established" and condition.status == "True" then
+          return {status = "Healthy", message = "CRD establishment complete"}
+        end
+      end
+      return {status = "Progressing", message = "Waiting for CRD establishment"}

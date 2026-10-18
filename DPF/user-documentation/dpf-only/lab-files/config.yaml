@@ -1,0 +1,36 @@
+# Lab example; change IPs/identities for another site. No credentials.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-site
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: 96b35f74e5df5cc05c864dbb7034cb206f828e2f
+    path: DPF/charts/site
+    helm:
+      valuesObject:
+        apiServerIP: 10.220.175.20
+        vipInterface: enp7s0
+        europeVIP: 192.168.0.200
+        asiaVIP: 192.168.0.203
+        install-dhcp: 'no'
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

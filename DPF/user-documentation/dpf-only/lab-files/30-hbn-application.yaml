@@ -1,0 +1,554 @@
+# Lab identities and networking; edit before using different hardware.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-hbn
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  project: default
+  source:
+    kustomize:
+      patches:
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              helmChart:
+                source:
+                  chart: doca-hbn
+                  repoURL: https://helm.ngc.nvidia.com/nvidia/doca
+                  version: 3.4.0
+                values:
+                  configuration:
+                    perDPUValuesYAML: "- hostnamePattern: dpu-node-mt2517602md3*\n  values:\n\
+                      \    bgp_peer_group: hbn\n    vrf1: EUROPE\n    l3vni1: 100001\n    bgp_autonomous_system:\
+                      \ 65101\n"
+                    startupYAMLJ2: "- header:\n    model: bluefield\n    nvue-api-version: nvue_v1\n\
+                      \    rev-id: 1.0\n    version: HBN 2.4.0\n- set:\n    evpn:\n      enable:\
+                      \ on\n      route-advertise: {}\n    interface:\n      lo:\n        ip:\n\
+                      \          address:\n            {{ ipaddresses.ip_lo.ip }}/32: {}\n \
+                      \       type: loopback\n      p0_if,p1_if,pf0hpf_if:\n        type: swp\n\
+                      \        link:\n          mtu: 9000\n      pf0hpf_if:\n        ip:\n \
+                      \         address:\n            {{ ipaddresses.ip_pf0hpf.cidr }}: {}\n\
+                      \          vrf: {{ config.vrf1 }}\n    nve:\n      vxlan:\n        arp-nd-suppress:\
+                      \ on\n        enable: on\n        source:\n          address: {{ ipaddresses.ip_lo.ip\
+                      \ }}\n    router:\n      bgp:\n        enable: on\n        graceful-restart:\n\
+                      \          mode: full\n    vrf:\n      default:\n        router:\n   \
+                      \       bgp:\n            address-family:\n              ipv4-unicast:\n\
+                      \                enable: on\n                redistribute:\n         \
+                      \         connected:\n                    enable: on\n               \
+                      \ multipaths:\n                  ebgp: 16\n              l2vpn-evpn:\n\
+                      \                enable: on\n            autonomous-system: {{ config.bgp_autonomous_system\
+                      \ }}\n            enable: on\n            neighbor:\n              p0_if:\n\
+                      \                peer-group: {{ config.bgp_peer_group }}\n           \
+                      \     type: unnumbered\n                address-family:\n            \
+                      \      l2vpn-evpn:\n                    enable: on\n                 \
+                      \   add-path-tx: off\n              p1_if:\n                peer-group:\
+                      \ {{ config.bgp_peer_group }}\n                type: unnumbered\n    \
+                      \            address-family:\n                  l2vpn-evpn:\n        \
+                      \            enable: on\n                    add-path-tx: off\n      \
+                      \      path-selection:\n              multipath:\n                aspath-ignore:\
+                      \ on\n            peer-group:\n              {{ config.bgp_peer_group\
+                      \ }}:\n                address-family:\n                  ipv4-unicast:\n\
+                      \                    enable: on\n                  l2vpn-evpn:\n     \
+                      \               enable: on\n                remote-as: external\n    \
+                      \        router-id: {{ ipaddresses.ip_lo.ip }}\n      {{ config.vrf1 }}:\n\
+                      \        evpn:\n          enable: on\n          vni:\n            {{ config.l3vni1\
+                      \ }}: {}\n        router:\n          bgp:\n            address-family:\n\
+                      \              ipv4-unicast:\n                enable: on\n           \
+                      \     redistribute:\n                  connected:\n                  \
+                      \  enable: on\n                route-export:\n                  to-evpn:\n\
+                      \                    enable: on\n            autonomous-system: {{ config.bgp_autonomous_system\
+                      \ }}\n            enable: on\n"
+                  image:
+                    repository: nvcr.io/nvidia/doca/doca_hbn
+                    tag: 3.4.0-doca3.4.0
+                  resources:
+                    memory: 6Gi
+                    nvidia.com/bf_sf: 3
+              interfaces:
+              - europe-hbn-p0
+              - europe-hbn-p1
+              - europe-hbn-pf0hpf
+              serviceDaemonSet:
+                annotations:
+                  k8s.v1.cni.cncf.io/networks: '[{"name": "iprequest", "interface": "ip_lo",
+                    "cni-args": {"poolNames": ["europe-loopback"], "poolType": "cidrpool"}},
+                    {"name": "iprequest", "interface": "ip_pf0hpf", "cni-args": {"poolNames":
+                    ["europe-host-overlap"], "poolType": "cidrpool", "allocateDefaultGateway":
+                    true}}]'
+                nodeSelector:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: In
+                      values:
+                      - dpu-node-mt2517602md3-mt2517602md3
+              serviceID: doca-hbn-europe
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUService
+          name: doca-hbn-europe
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                spec:
+                  template:
+                    spec:
+                      switches:
+                      - ports:
+                        - serviceInterface:
+                            matchLabels:
+                              interface: p0
+                              training.dpf.nvidia.com/tenant: europe
+                        - serviceInterface:
+                            matchLabels:
+                              svc.dpu.nvidia.com/interface: p0_if
+                              svc.dpu.nvidia.com/service: doca-hbn-europe
+                        serviceMTU: 1500
+                      - ports:
+                        - serviceInterface:
+                            matchLabels:
+                              interface: p1
+                              training.dpf.nvidia.com/tenant: europe
+                        - serviceInterface:
+                            matchLabels:
+                              svc.dpu.nvidia.com/interface: p1_if
+                              svc.dpu.nvidia.com/service: doca-hbn-europe
+                        serviceMTU: 1500
+                      - ports:
+                        - serviceInterface:
+                            matchLabels:
+                              interface: pf0hpf
+                              training.dpf.nvidia.com/tenant: europe
+                        - serviceInterface:
+                            matchLabels:
+                              svc.dpu.nvidia.com/interface: pf0hpf_if
+                              svc.dpu.nvidia.com/service: doca-hbn-europe
+                        serviceMTU: 1500
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceChain
+          name: europe-hbn
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              deploymentServiceName: doca-hbn
+              interfaces:
+              - name: p0_if
+                network: mybrhbn
+              - name: p1_if
+                network: mybrhbn
+              - name: pf0hpf_if
+                network: mybrhbn
+              serviceConfiguration:
+                helmChart:
+                  values:
+                    configuration:
+                      perDPUValuesYAML: "- hostnamePattern: dpu-node-mt2517601zfk*\n  values:\n\
+                        \    bgp_peer_group: hbn\n    vrf1: ASIA\n    l3vni1: 100002\n    bgp_autonomous_system:\
+                        \ 65201\n"
+                      startupYAMLJ2: "- header:\n    model: bluefield\n    nvue-api-version:\
+                        \ nvue_v1\n    rev-id: 1.0\n    version: HBN 2.4.0\n- set:\n    evpn:\n\
+                        \      enable: on\n      route-advertise: {}\n    interface:\n     \
+                        \ lo:\n        ip:\n          address:\n            {{ ipaddresses.ip_lo.ip\
+                        \ }}/32: {}\n        type: loopback\n      p0_if,p1_if,pf0hpf_if:\n\
+                        \        type: swp\n        link:\n          mtu: 9000\n      pf0hpf_if:\n\
+                        \        ip:\n          address:\n            {{ ipaddresses.ip_pf0hpf.cidr\
+                        \ }}: {}\n          vrf: {{ config.vrf1 }}\n    nve:\n      vxlan:\n\
+                        \        arp-nd-suppress: on\n        enable: on\n        source:\n\
+                        \          address: {{ ipaddresses.ip_lo.ip }}\n    router:\n      bgp:\n\
+                        \        enable: on\n        graceful-restart:\n          mode: full\n\
+                        \    vrf:\n      default:\n        router:\n          bgp:\n       \
+                        \     address-family:\n              ipv4-unicast:\n               \
+                        \ enable: on\n                redistribute:\n                  connected:\n\
+                        \                    enable: on\n                multipaths:\n     \
+                        \             ebgp: 16\n              l2vpn-evpn:\n                enable:\
+                        \ on\n            autonomous-system: {{ config.bgp_autonomous_system\
+                        \ }}\n            enable: on\n            neighbor:\n              p0_if:\n\
+                        \                peer-group: {{ config.bgp_peer_group }}\n         \
+                        \       type: unnumbered\n                address-family:\n        \
+                        \          l2vpn-evpn:\n                    enable: on\n           \
+                        \         add-path-tx: off\n              p1_if:\n                peer-group:\
+                        \ {{ config.bgp_peer_group }}\n                type: unnumbered\n  \
+                        \              address-family:\n                  l2vpn-evpn:\n    \
+                        \                enable: on\n                    add-path-tx: off\n\
+                        \            path-selection:\n              multipath:\n           \
+                        \     aspath-ignore: on\n            peer-group:\n              {{ config.bgp_peer_group\
+                        \ }}:\n                address-family:\n                  ipv4-unicast:\n\
+                        \                    enable: on\n                  l2vpn-evpn:\n   \
+                        \                 enable: on\n                remote-as: external\n\
+                        \            router-id: {{ ipaddresses.ip_lo.ip }}\n      {{ config.vrf1\
+                        \ }}:\n        evpn:\n          enable: on\n          vni:\n       \
+                        \     {{ config.l3vni1 }}: {}\n        router:\n          bgp:\n   \
+                        \         address-family:\n              ipv4-unicast:\n           \
+                        \     enable: on\n                redistribute:\n                  connected:\n\
+                        \                    enable: on\n                route-export:\n   \
+                        \               to-evpn:\n                    enable: on\n         \
+                        \   autonomous-system: {{ config.bgp_autonomous_system }}\n        \
+                        \    enable: on\n"
+                serviceDaemonSet:
+                  annotations:
+                    k8s.v1.cni.cncf.io/networks: '[{"name": "iprequest", "interface": "ip_lo",
+                      "cni-args": {"poolNames": ["asia-loopback"], "poolType": "cidrpool"}},
+                      {"name": "iprequest", "interface": "ip_pf0hpf", "cni-args": {"poolNames":
+                      ["asia-host-overlap"], "poolType": "cidrpool", "allocateDefaultGateway":
+                      true}}]'
+              upgradePolicy:
+                applyNodeEffect: false
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceConfiguration
+          name: doca-hbn-asia
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: asia
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: p0
+                        training.dpf.nvidia.com/tenant: asia
+                    spec:
+                      interfaceType: physical
+                      physical:
+                        interfaceName: p0
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: asia-p0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: asia
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: p1
+                        training.dpf.nvidia.com/tenant: asia
+                    spec:
+                      interfaceType: physical
+                      physical:
+                        interfaceName: p1
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: asia-p1
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: asia
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: pf0hpf
+                        training.dpf.nvidia.com/tenant: asia
+                    spec:
+                      interfaceType: pf
+                      pf:
+                        pfID: 0
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: asia-pf0hpf
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                metadata: {}
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        svc.dpu.nvidia.com/interface: p0_if
+                        svc.dpu.nvidia.com/service: doca-hbn-europe
+                    spec:
+                      interfaceType: service
+                      service:
+                        interfaceName: p0_if
+                        network: mybrhbn
+                        serviceID: doca-hbn-europe
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-hbn-p0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                metadata: {}
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        svc.dpu.nvidia.com/interface: p1_if
+                        svc.dpu.nvidia.com/service: doca-hbn-europe
+                    spec:
+                      interfaceType: service
+                      service:
+                        interfaceName: p1_if
+                        network: mybrhbn
+                        serviceID: doca-hbn-europe
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-hbn-p1
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                metadata: {}
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        svc.dpu.nvidia.com/interface: pf0hpf_if
+                        svc.dpu.nvidia.com/service: doca-hbn-europe
+                    spec:
+                      interfaceType: service
+                      service:
+                        interfaceName: pf0hpf_if
+                        network: mybrhbn
+                        serviceID: doca-hbn-europe
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-hbn-pf0hpf
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: p0
+                        training.dpf.nvidia.com/tenant: europe
+                    spec:
+                      interfaceType: physical
+                      physical:
+                        interfaceName: p0
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-p0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: p1
+                        training.dpf.nvidia.com/tenant: europe
+                    spec:
+                      interfaceType: physical
+                      physical:
+                        interfaceName: p1
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-p1
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: pf0hpf
+                        training.dpf.nvidia.com/tenant: europe
+                    spec:
+                      interfaceType: pf
+                      pf:
+                        pfID: 0
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-pf0hpf
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              template:
+                spec:
+                  template:
+                    metadata:
+                      labels:
+                        interface: pf1hpf
+                        training.dpf.nvidia.com/tenant: europe
+                    spec:
+                      interfaceType: pf
+                      pf:
+                        pfID: 1
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceInterface
+          name: europe-pf1hpf
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: asia
+              ipv4Network:
+                gatewayIndex: 2
+                network: 10.0.127.0/29
+                prefixSize: 29
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceIPAM
+          name: asia-host
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: asia
+              ipv4Network:
+                network: 10.0.124.35/32
+                prefixSize: 32
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceIPAM
+          name: asia-loopback
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              ipv4Network:
+                gatewayIndex: 2
+                network: 10.0.126.0/29
+                prefixSize: 29
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceIPAM
+          name: europe-host
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuClusterSelector:
+                matchLabels:
+                  training.dpf.nvidia.com/tenant: europe
+              ipv4Network:
+                network: 10.0.124.34/32
+                prefixSize: 32
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceIPAM
+          name: europe-loopback
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              deploymentServiceName: doca-hbn
+              helmChart:
+                source:
+                  chart: doca-hbn
+                  repoURL: https://helm.ngc.nvidia.com/nvidia/doca
+                  version: 3.4.0
+                values:
+                  image:
+                    repository: nvcr.io/nvidia/doca/doca_hbn
+                    tag: 3.4.0-doca3.4.0
+                  resources:
+                    memory: 6Gi
+                    nvidia.com/bf_sf: 3
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUServiceTemplate
+          name: doca-hbn-asia
+          version: v1alpha1
+    path: DPF/profiles/two-tenant-hbn/overlapping-subnets
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: 96b35f74e5df5cc05c864dbb7034cb206f828e2f
+  syncPolicy:
+    retry:
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true

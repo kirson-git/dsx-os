@@ -1,0 +1,456 @@
+# Lab identities and networking; edit before using different hardware.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-provisioning
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  project: default
+  source:
+    kustomize:
+      patches:
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              url: https://content.mellanox.com/BlueField/BFBs/Ubuntu24.04/bf-bundle-3.4.0-92_26.04_ubuntu-24.04_64k_prod.bfb
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: BFB
+          name: bf-bundle-v26.4.0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpus:
+                bfb: bf-bundle-v26.4.0
+                dpuSetStrategy:
+                  type: OnDelete
+                dpuSets:
+                - dpuClusterSelector:
+                    training.dpf.nvidia.com/tenant: asia
+                  dpuDeviceSelector:
+                    matchLabels:
+                      provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.249
+                      provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517601zfk
+                  dpuNodeSelector:
+                    matchLabels:
+                      feature.node.kubernetes.io/dpu-enabled: 'true'
+                      training.dpf.nvidia.com/selected: 'true'
+                      training.dpf.nvidia.com/tenant: asia
+                  nameSuffix: asia
+                flavor: hbn-asia-dns-ntp-v26.4.0
+                nodeEffect:
+                  force: false
+                  hold: true
+              revisionHistoryLimit: 10
+              serviceChains:
+                switches:
+                - ports:
+                  - serviceInterface:
+                      matchLabels:
+                        interface: p0
+                  - service:
+                      interface: p0_if
+                      name: doca-hbn
+                  serviceMTU: 1500
+                - ports:
+                  - serviceInterface:
+                      matchLabels:
+                        interface: p1
+                  - service:
+                      interface: p1_if
+                      name: doca-hbn
+                  serviceMTU: 1500
+                - ports:
+                  - serviceInterface:
+                      matchLabels:
+                        interface: pf0hpf
+                  - service:
+                      interface: pf0hpf_if
+                      name: doca-hbn
+                  serviceMTU: 1500
+                upgradePolicy:
+                  applyNodeEffect: true
+              services:
+                doca-hbn:
+                  serviceConfiguration: doca-hbn-asia
+                  serviceTemplate: doca-hbn-asia
+        target:
+          group: svc.dpu.nvidia.com
+          kind: DPUDeployment
+          name: hbn-asia
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              bmcIp: 192.168.0.249
+              bmcPort: 443
+              numberOfPFs: 1
+              opn: 900-9D3B4-00CV-EA0
+              serialNumber: MT2517601ZFK
+          - op: replace
+            path: /metadata/name
+            value: mt2517601zfk
+          - op: add
+            path: /metadata/labels
+            value:
+              provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.249
+              provisioning.dpu.nvidia.com/dpudevice-opn: 900-9D3B4-00CV-EA0
+              provisioning.dpu.nvidia.com/dpudevice-psid: MT2517601ZFK
+              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517601zfk
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUDevice
+          name: example-asia
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              bmcIp: 192.168.0.246
+              bmcPort: 443
+              numberOfPFs: 1
+              opn: 900-9D3B4-00CV-EA0
+              serialNumber: MT2517602MD3
+          - op: replace
+            path: /metadata/name
+            value: mt2517602md3
+          - op: add
+            path: /metadata/labels
+            value:
+              provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.246
+              provisioning.dpu.nvidia.com/dpudevice-opn: 900-9D3B4-00CV-EA0
+              provisioning.dpu.nvidia.com/dpudevice-psid: MT2517602MD3
+              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517602md3
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUDevice
+          name: example-europe
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              bfcfgParameters:
+              - UPDATE_ATF_UEFI=yes
+              - UPDATE_DPU_OS=yes
+              - WITH_NIC_FW_UPDATE=yes
+              configFiles:
+              - operation: override
+                path: /etc/mellanox/mlnx-bf.conf
+                permissions: '0644'
+                raw: 'ALLOW_SHARED_RQ="no"
+
+                  IPSEC_FULL_OFFLOAD="no"
+
+                  ENABLE_ESWITCH_MULTIPORT="yes"
+
+                  '
+              - operation: override
+                path: /etc/mellanox/mlnx-ovs.conf
+                permissions: '0644'
+                raw: 'CREATE_OVS_BRIDGES="no"
+
+                  OVS_DOCA="yes"
+
+                  '
+              - operation: override
+                path: /etc/mellanox/mlnx-sf.conf
+                permissions: '0644'
+                raw: ''
+              - operation: override
+                path: /etc/netplan/60-asia-lab-dns.yaml
+                permissions: '0600'
+                raw: "network:\n  version: 2\n  ethernets:\n    oob_net0:\n      nameservers:\n\
+                  \        addresses: [10.61.13.53, 10.10.10.53, 10.10.10.54]\n"
+              - operation: override
+                path: /etc/systemd/system/dpu-agent.service.d/10-time-sync.conf
+                permissions: '0644'
+                raw: '[Unit]
+
+                  Requires=ntpsec.service
+
+                  After=ntpsec.service
+
+
+                  [Service]
+
+                  ExecStartPre=/usr/sbin/ntpwait -n 90 -s 2 -v
+
+                  TimeoutStartSec=240
+
+                  '
+              containerdConfig: {}
+              dpuMode: zero-trust
+              grub:
+                kernelParameters:
+                - console=hvc0
+                - console=ttyAMA0
+                - earlycon=pl011,0x13010000
+                - fixrttc
+                - net.ifnames=0
+                - biosdevname=0
+                - iommu.passthrough=1
+                - cgroup_no_v1=net_prio,net_cls
+                - hugepagesz=2048kB
+                - hugepages=3072
+              nvconfig:
+              - device: '*'
+                parameters:
+                - PF_BAR2_ENABLE=0
+                - PER_PF_NUM_SF=1
+                - PF_TOTAL_SF=20
+                - PF_SF_BAR_SIZE=10
+                - NUM_PF_MSIX_VALID=0
+                - PF_NUM_PF_MSIX_VALID=1
+                - PF_NUM_PF_MSIX=228
+                - INTERNAL_CPU_MODEL=1
+                - INTERNAL_CPU_OFFLOAD_ENGINE=0
+                - SRIOV_EN=1
+                - NUM_OF_VFS=46
+                - LAG_RESOURCE_ALLOCATION=1
+                - LINK_TYPE_P1=ETH
+                - LINK_TYPE_P2=ETH
+              ovs:
+                rawConfigScript: "_ovs-vsctl() {\n  ovs-vsctl --timeout 15 \"$@\"\n}\n\n# Remove\
+                  \ default OVS configuration on the DPU and ensure no leftovers on the OVS\
+                  \ kernel side\n_ovs-vsctl --if-exists del-br ovsbr1\n_ovs-vsctl --if-exists\
+                  \ del-br ovsbr2\novs-appctl --timeout 15 dpctl/del-dp system@ovs-system ||\
+                  \ true\n\n_ovs-vsctl set Open_vSwitch . other_config:doca-init=true\n_ovs-vsctl\
+                  \ set Open_vSwitch . other_config:dpdk-max-memzones=50000\n_ovs-vsctl set\
+                  \ Open_vSwitch . other_config:hw-offload=true\n_ovs-vsctl set Open_vSwitch\
+                  \ . other_config:pmd-quiet-idle=true\n_ovs-vsctl set Open_vSwitch . other_config:max-idle=20000\n\
+                  _ovs-vsctl set Open_vSwitch . other_config:max-revalidator=5000\n_ovs-vsctl\
+                  \ remove Open_vSwitch . other_config default-datapath-type || true\n\nif systemctl\
+                  \ list-unit-files openvswitch-switch.service &>/dev/null; then\n  systemctl\
+                  \ restart openvswitch-switch\nelif systemctl list-unit-files openvswitch.service\
+                  \ &>/dev/null; then\n  systemctl restart openvswitch\nfi\n_ovs-vsctl --may-exist\
+                  \ add-br br-sfc\n_ovs-vsctl set bridge br-sfc datapath_type=netdev\n_ovs-vsctl\
+                  \ set bridge br-sfc fail_mode=secure\n_ovs-vsctl --may-exist add-port br-sfc\
+                  \ p0\n_ovs-vsctl set Interface p0 type=dpdk\n_ovs-vsctl set Interface p0 mtu_request=9216\n\
+                  _ovs-vsctl set Port p0 external_ids:dpf-type=physical\n_ovs-vsctl --may-exist\
+                  \ add-br br-hbn\n_ovs-vsctl set bridge br-hbn datapath_type=netdev\n_ovs-vsctl\
+                  \ set bridge br-hbn fail_mode=secure\n"
+              sysctl: {}
+          - op: replace
+            path: /metadata/name
+            value: hbn-asia-dns-ntp-v26.4.0
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUFlavor
+          name: hbn-asia-example-v26.4.0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              bfcfgParameters:
+              - UPDATE_ATF_UEFI=yes
+              - UPDATE_DPU_OS=yes
+              - WITH_NIC_FW_UPDATE=yes
+              configFiles:
+              - operation: override
+                path: /etc/mellanox/mlnx-bf.conf
+                permissions: '0644'
+                raw: 'ALLOW_SHARED_RQ="no"
+
+                  IPSEC_FULL_OFFLOAD="no"
+
+                  ENABLE_ESWITCH_MULTIPORT="yes"
+
+                  '
+              - operation: override
+                path: /etc/mellanox/mlnx-ovs.conf
+                permissions: '0644'
+                raw: 'CREATE_OVS_BRIDGES="no"
+
+                  OVS_DOCA="yes"
+
+                  '
+              - operation: override
+                path: /etc/mellanox/mlnx-sf.conf
+                permissions: '0644'
+                raw: ''
+              - operation: override
+                path: /etc/netplan/60-europe-lab-dns.yaml
+                permissions: '0600'
+                raw: "network:\n  version: 2\n  ethernets:\n    oob_net0:\n      nameservers:\n\
+                  \        addresses: [10.61.13.53, 10.10.10.53, 10.10.10.54]\n"
+              - operation: override
+                path: /etc/systemd/system/dpu-agent.service.d/10-time-sync.conf
+                permissions: '0644'
+                raw: '[Unit]
+
+                  Requires=ntpsec.service
+
+                  After=ntpsec.service
+
+
+                  [Service]
+
+                  ExecStartPre=/usr/sbin/ntpwait -n 90 -s 2 -v
+
+                  TimeoutStartSec=240
+
+                  '
+              containerdConfig: {}
+              dpuMode: zero-trust
+              grub:
+                kernelParameters:
+                - console=hvc0
+                - console=ttyAMA0
+                - earlycon=pl011,0x13010000
+                - fixrttc
+                - net.ifnames=0
+                - biosdevname=0
+                - iommu.passthrough=1
+                - cgroup_no_v1=net_prio,net_cls
+                - hugepagesz=2048kB
+                - hugepages=3072
+              nvconfig:
+              - device: '*'
+                parameters:
+                - PF_BAR2_ENABLE=0
+                - PER_PF_NUM_SF=1
+                - PF_TOTAL_SF=20
+                - PF_SF_BAR_SIZE=10
+                - NUM_PF_MSIX_VALID=0
+                - PF_NUM_PF_MSIX_VALID=1
+                - PF_NUM_PF_MSIX=228
+                - INTERNAL_CPU_MODEL=1
+                - INTERNAL_CPU_OFFLOAD_ENGINE=0
+                - SRIOV_EN=1
+                - NUM_OF_VFS=46
+                - LAG_RESOURCE_ALLOCATION=1
+                - LINK_TYPE_P1=ETH
+                - LINK_TYPE_P2=ETH
+              ovs:
+                rawConfigScript: "_ovs-vsctl() {\n  ovs-vsctl --timeout 15 \"$@\"\n}\n\n# Remove\
+                  \ default OVS configuration on the DPU and ensure no leftovers on the OVS\
+                  \ kernel side\n_ovs-vsctl --if-exists del-br ovsbr1\n_ovs-vsctl --if-exists\
+                  \ del-br ovsbr2\novs-appctl --timeout 15 dpctl/del-dp system@ovs-system ||\
+                  \ true\n\n_ovs-vsctl set Open_vSwitch . other_config:doca-init=true\n_ovs-vsctl\
+                  \ set Open_vSwitch . other_config:dpdk-max-memzones=50000\n_ovs-vsctl set\
+                  \ Open_vSwitch . other_config:hw-offload=true\n_ovs-vsctl set Open_vSwitch\
+                  \ . other_config:pmd-quiet-idle=true\n_ovs-vsctl set Open_vSwitch . other_config:max-idle=20000\n\
+                  _ovs-vsctl set Open_vSwitch . other_config:max-revalidator=5000\n_ovs-vsctl\
+                  \ set Open_vSwitch . other_config:doca-congestion-threshold=60\n_ovs-vsctl\
+                  \ set Open_vSwitch . other_config:flow-limit=500000\n_ovs-vsctl set Open_vSwitch\
+                  \ . other_config:hw-offload-ct-unidir-udp-enabled=true\n_ovs-vsctl remove\
+                  \ Open_vSwitch . other_config default-datapath-type || true\n\nif systemctl\
+                  \ list-unit-files openvswitch-switch.service &>/dev/null; then\n  systemctl\
+                  \ restart openvswitch-switch\nelif systemctl list-unit-files openvswitch.service\
+                  \ &>/dev/null; then\n  systemctl restart openvswitch\nfi\n_ovs-vsctl --may-exist\
+                  \ add-br br-sfc\n_ovs-vsctl set bridge br-sfc datapath_type=netdev\n_ovs-vsctl\
+                  \ set bridge br-sfc fail_mode=secure\n_ovs-vsctl --may-exist add-port br-sfc\
+                  \ p0\n_ovs-vsctl set Interface p0 type=dpdk\n_ovs-vsctl set Interface p0 mtu_request=9216\n\
+                  _ovs-vsctl set Port p0 external_ids:dpf-type=physical\n"
+              sysctl: {}
+          - op: replace
+            path: /metadata/name
+            value: passthrough-europe-dns-ntp-v1
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUFlavor
+          name: hbn-europe-example-v26.4.0
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpus:
+              - name: mt2517601zfk
+              nodeRebootMethod:
+                external: {}
+          - op: replace
+            path: /metadata/name
+            value: dpu-node-mt2517601zfk
+          - op: add
+            path: /metadata/labels
+            value:
+              feature.node.kubernetes.io/dpu-enabled: 'true'
+              training.dpf.nvidia.com/selected: 'true'
+              training.dpf.nvidia.com/tenant: asia
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUNode
+          name: dpu-node-example-asia
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpus:
+              - name: mt2517602md3
+              nodeRebootMethod:
+                external: {}
+          - op: replace
+            path: /metadata/name
+            value: dpu-node-mt2517602md3
+          - op: add
+            path: /metadata/labels
+            value:
+              feature.node.kubernetes.io/dpu-enabled: 'true'
+              training.dpf.nvidia.com/selected: 'true'
+              training.dpf.nvidia.com/tenant: europe
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUNode
+          name: dpu-node-example-europe
+          version: v1alpha1
+      - patch: |
+          - op: replace
+            path: /spec
+            value:
+              dpuDeviceSelector:
+                matchLabels:
+                  provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.246
+                  provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517602md3
+              dpuNodeSelector:
+                matchLabels:
+                  feature.node.kubernetes.io/dpu-enabled: 'true'
+                  training.dpf.nvidia.com/selected: 'true'
+                  training.dpf.nvidia.com/tenant: europe
+              dpuTemplate:
+                spec:
+                  bfb:
+                    name: bf-bundle-v26.4.0
+                  cluster:
+                    selector:
+                      matchLabels:
+                        training.dpf.nvidia.com/tenant: europe
+                  dpuFlavor: passthrough-europe-dns-ntp-v1
+                  nodeEffect:
+                    applyOnLabelChange: false
+                    force: false
+                    hold: true
+              strategy:
+                type: OnDelete
+          - op: replace
+            path: /metadata/name
+            value: passthrough-europe
+        target:
+          group: provisioning.dpu.nvidia.com
+          kind: DPUSet
+          name: hbn-europe
+          version: v1alpha1
+    path: DPF/profiles/two-tenant-hbn/desired/40-provisioning
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: 96b35f74e5df5cc05c864dbb7034cb206f828e2f
+  syncPolicy:
+    retry:
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true

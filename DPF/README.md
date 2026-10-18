@@ -1,6 +1,11 @@
 # Install DPF step by step
 
 **Download [config.yaml][raw-config], edit your settings, then apply each stage.**
+
+[DPF-only installation PDF](user-documentation/dpf-only/DPF-only-installation.pdf) |
+[Copyable steps](user-documentation/dpf-only/DPF-only-installation.txt) |
+[Lab YAML files](user-documentation/dpf-only/DPF-only-lab-files.zip)
+
 Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
 [Download the two-page SSH and HBN demo PDF](user-documentation/DPF-HBN-two-tenant-demo.pdf)
 ([copyable commands](user-documentation/DPF-HBN-two-tenant-demo.txt)).

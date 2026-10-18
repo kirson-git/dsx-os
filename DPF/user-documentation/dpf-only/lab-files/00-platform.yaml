@@ -1,0 +1,31 @@
+# Lab example; change IPs/identities for another site. No credentials.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dpf-platform
+  namespace: argocd
+  labels:
+    customer.dpf.nvidia.com/package: dpf-platform-v26.4.0
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirson-git/dsx-os.git
+    targetRevision: 96b35f74e5df5cc05c864dbb7034cb206f828e2f
+    path: DPF/generated/platform
+    directory:
+      recurse: false
+      include: '*.yaml'
+  destination:
+    name: in-cluster
+    namespace: dpf-operator-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - ClientSideApplyMigration=false
+    - FailOnSharedResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
