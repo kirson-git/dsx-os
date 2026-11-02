@@ -14,7 +14,11 @@ KUBESPRAY_COMMIT="1c9add48975060f45396b34d8e022c30d7f80dab"
 KUBESPRAY_IMAGE_DIGEST="sha256:6ecdd749a3661c44656ea66d9cff22bbd0b58e3d6122b59ec52ddaaa677f919d"
 KUBESPRAY_IMAGE="quay.io/kubespray/kubespray@${KUBESPRAY_IMAGE_DIGEST}"
 
-KUBE_VERSION="1.35.4"
+# Kubernetes releases carried by the pinned Kubespray image (kubelet checksum table).
+KUBE_VERSION_MIN="1.33.0"
+KUBE_VERSION_MAX="1.35.4"
+DEFAULT_KUBE_VERSION="$KUBE_VERSION_MAX"
+KUBE_VERSION="$DEFAULT_KUBE_VERSION"
 CONTAINERD_VERSION="2.2.3"
 CALICO_VERSION="v3.31.5"
 DEFAULT_POD_CIDR="10.233.64.0/18"
@@ -29,11 +33,13 @@ declare -a WORKER_HOSTS=()
 SSH_PRIVATE_KEY=
 AUTO_APPROVE=false
 REQUESTED_CLUSTER_NAME=
+LOCAL_STORAGECLASS=yes
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./kubespray-wizard.sh -m MASTER_LIST -w WORKER_LIST [-k PRIVATE_KEY] [--cluster-name NAME] [-y]
+  ./kubespray-wizard.sh -m MASTER_LIST -w WORKER_LIST [-k PRIVATE_KEY] [--cluster-name NAME]
+                        [--kube-version X.Y.Z] [--local-storageclass yes|no] [-y]
   ./kubespray-wizard.sh --resume CLUSTER_NAME [-k PRIVATE_KEY] [-y]
   ./kubespray-wizard.sh --add-server HOST --cluster-name NAME [--server-ip IP] [-k PRIVATE_KEY] [-y] [--dry-run]
 
@@ -57,6 +63,14 @@ Lists may be comma-separated or quoted and space-separated. The master list
 must contain exactly one or three unique servers. A server in both lists is
 assigned both roles. --cluster-name NAME sets the inventory and Kubespray cluster
 name. The internal cluster DNS domain is set separately to cluster.local.
+--kube-version X.Y.Z selects the Kubernetes release for a new cluster; see the
+supported range at the end of this help. The wizard verifies the release against
+the pinned Kubespray image before writing the inventory and lists every
+supported release when it is not available. Resume and --add-server reuse the
+version saved in the inventory, so this flag applies only to new clusters.
+--local-storageclass yes|no (default yes) installs Kubespray's local-path
+provisioner as the default StorageClass `local-path` (Retain reclaim policy)
+on the new cluster. Choose no when the site supplies its own CSI storage.
 Use lowercase letters,
 digits, and hyphens, starting with a letter or digit. Without this flag, the
 inventory name is generated automatically; DNS still uses cluster.local.
@@ -76,6 +90,10 @@ file on the target nodes. It uses upstream_dns_servers from the inventory when
 set, otherwise existing node resolvers; it excludes loopback and cluster ranges
 and keeps at most three unique servers. No usable upstream aborts deployment.
 EOF
+  printf '\nKubernetes releases supported by Kubespray %s:\n' "$KUBESPRAY_TAG"
+  printf '  minimum %s, maximum %s (default %s); any patch release in between\n' \
+    "$KUBE_VERSION_MIN" "$KUBE_VERSION_MAX" "$DEFAULT_KUBE_VERSION"
+  printf '  that Kubespray published checksums for is accepted.\n'
 }
 
 die() {
@@ -93,6 +111,29 @@ validate_name() {
 
 validate_cluster_name() {
   [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]]
+}
+
+validate_kube_version() {
+  [[ "$1" =~ ^1\.[0-9]+\.[0-9]+$ ]]
+}
+
+# The pinned Kubespray image carries a checksum table for every Kubernetes
+# release it can install. Refuse versions that are missing from it instead of
+# letting cluster.yml fail halfway through the download stage.
+verify_kube_version_supported() {
+  local version=$1 supported
+  supported=$(docker run --rm --entrypoint sh "$KUBESPRAY_IMAGE" -c '
+    files=$(ls roles/kubespray_defaults/vars/main/checksums.yml roles/kubespray-defaults/vars/main/checksums.yml 2>/dev/null)
+    [ -n "$files" ] || exit 3
+    awk "/^kubelet_checksums:/{f=1;next} f&&/^[a-z_]+:/{f=0} f&&/^  amd64:/{a=1;next} f&&/^  [a-z0-9]+:/{a=0} f&&a&&/^    [0-9]+\\.[0-9]+\\.[0-9]+:/{print \$1}" $files | tr -d ":" | sort -t. -k2,2n -k3,3n -u') ||
+    die "could not read the Kubernetes checksum table from the Kubespray image"
+  if ! printf '%s\n' "$supported" | grep -qxF "$version"; then
+    printf 'Kubernetes %s is not shipped by Kubespray %s. Supported releases:\n' "$version" "$KUBESPRAY_TAG" >&2
+    printf '%s\n' "$supported" | tr '\n' ' ' | fold -s -w 76 | sed 's/^/  /' >&2
+    printf '\n' >&2
+    die "choose a supported --kube-version"
+  fi
+  printf 'Kubernetes %s is available in the pinned Kubespray image.\n' "$version"
 }
 
 validate_ipv4() {
@@ -462,12 +503,17 @@ write_inventory() {
 
   {
     printf '%s\n' '---'
-    printf '%s\n' 'local_path_provisioner_enabled: true'
-    printf '%s\n' 'local_path_provisioner_namespace: local-path-storage'
-    printf '%s\n' 'local_path_provisioner_storage_class: local-path'
-    printf '%s\n' 'local_path_provisioner_claim_root: /opt/local-path-provisioner/'
-    printf '%s\n' 'local_path_provisioner_is_default_storageclass: "true"'
-    printf '%s\n' 'local_path_provisioner_reclaim_policy: Retain'
+    if [ "$LOCAL_STORAGECLASS" = yes ]; then
+      printf '%s\n' 'local_path_provisioner_enabled: true'
+      printf '%s\n' 'local_path_provisioner_namespace: local-path-storage'
+      printf '%s\n' 'local_path_provisioner_storage_class: local-path'
+      printf '%s\n' 'local_path_provisioner_claim_root: /opt/local-path-provisioner/'
+      printf '%s\n' 'local_path_provisioner_is_default_storageclass: "true"'
+      printf '%s\n' 'local_path_provisioner_reclaim_policy: Retain'
+    else
+      printf '%s\n' '# --local-storageclass no: the site provides its own StorageClass.'
+      printf '%s\n' 'local_path_provisioner_enabled: false'
+    fi
   } >"$staging/group_vars/k8s_cluster/addons.yml"
 
   {
@@ -478,7 +524,8 @@ write_inventory() {
     printf -- '- containerd default from pinned Kubespray: `%s`\n' "$CONTAINERD_VERSION"
     printf -- '- Calico default from pinned Kubespray: `%s`\n' "$CALICO_VERSION"
     printf -- '- Pod CIDR: `%s`\n' "$pod_cidr"
-    printf -- '- Service CIDR: `%s`\n\n' "$service_cidr"
+    printf -- '- Service CIDR: `%s`\n' "$service_cidr"
+    printf -- '- Local StorageClass (local-path): `%s`\n\n' "$LOCAL_STORAGECLASS"
     printf 'No passwords, private keys, kubeconfigs, or registry tokens belong in this directory.\n\n'
     printf 'This wizard does not create VM snapshots or backups.\n'
     printf 'Kubernetes downgrade is not a supported rollback strategy.\n'
@@ -491,6 +538,7 @@ write_inventory() {
     printf 'kubernetes=%s\n' "$KUBE_VERSION"
     printf 'containerd=%s\n' "$CONTAINERD_VERSION"
     printf 'calico=%s\n' "$CALICO_VERSION"
+    printf 'local_storageclass=%s\n' "$LOCAL_STORAGECLASS"
     for index in "${!NODE_NAMES[@]}"; do
       printf 'node=%s ip=%s role=%s\n' \
         "${NODE_NAMES[$index]}" "${NODE_IPS[$index]}" "${NODE_ROLES[$index]}"
@@ -562,6 +610,7 @@ show_plan() {
   printf 'Cluster: %s\n' "$cluster_name"
   printf 'Kubespray: %s (%s)\n' "$KUBESPRAY_TAG" "$KUBESPRAY_COMMIT"
   printf 'Kubernetes: %s\n' "$KUBE_VERSION"
+  printf 'Local StorageClass: %s\n' "$LOCAL_STORAGECLASS"
   printf '%-32s %-15s %-8s\n' 'SERVER' 'IP' 'ROLE'
   for index in "${!NODE_NAMES[@]}"; do
     printf '%-32s %-15s %-8s\n' \
@@ -935,6 +984,17 @@ main() {
         REQUESTED_CLUSTER_NAME=$2
         shift 2
         ;;
+      --local-storageclass)
+        [ "$#" -ge 2 ] && [[ "$2" =~ ^(yes|no)$ ]] || die "--local-storageclass requires yes or no"
+        LOCAL_STORAGECLASS=$2
+        shift 2
+        ;;
+      --kube-version)
+        [ "$#" -ge 2 ] && [ -n "$2" ] && [[ "$2" != --* ]] || die "--kube-version requires a release such as $DEFAULT_KUBE_VERSION"
+        KUBE_VERSION=${2#v}
+        validate_kube_version "$KUBE_VERSION" || die "invalid --kube-version; use the form 1.MINOR.PATCH"
+        shift 2
+        ;;
       *)
         usage >&2
         die "unknown argument: $1"
@@ -971,6 +1031,8 @@ main() {
   validate_cluster_name "$cluster_name" || die "generated an invalid cluster name"
 
   validate_topology
+  prepare_kubespray_image
+  verify_kube_version_supported "$KUBE_VERSION"
   show_plan "$cluster_name"
   write_inventory "$cluster_name" "$ssh_user" "$pod_cidr" "$service_cidr"
   run_preflight_and_apply "$cluster_name"
