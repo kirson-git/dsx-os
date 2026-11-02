@@ -104,13 +104,13 @@ Edit spec.source.helm.valuesObject — these are the variables Argo passes to He
 
 | Variable | Lab value |
 | --- | --- |
-| apiServerIP | 10.220.175.20 — existing Kubernetes API |
+| apiServerIP | 192.0.2.20 — existing Kubernetes API |
 | vipInterface | enp7s0 — tenant VIP interface |
 | europeVIP | 192.168.0.200 — reserved manually |
 | asiaVIP | 192.168.0.203 — reserved manually |
 | install-dhcp | "no" — retain existing DHCP |
 
-Existing DHCP runs on l-ae-1137d, server IP 192.168.0.129; it supplies DPU OS
+Existing DHCP runs on mgmt-host, server IP 192.168.0.129; it supplies DPU OS
 addresses .244 / .242. Tenant VIPs are not DHCP allocations.
 DHCP settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/DHCP.md) explain the optional Kubernetes DHCP installation.
 
@@ -141,7 +141,7 @@ curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/mai
 bash "$HOME/.local/bin/dpf-credentials" \
   --ip 192.168.0.246,192.168.0.249 \
   --bmc-pass /tmp/dpf-lab/private/bmc-credentials \
-  --node l-ae-1137d-001 --insecure-bmc
+  --node mgmt-node-01 --insecure-bmc
 kubectl -n dpf-operator-system get secret bmc-shared-password
 
 --ip means DPU BMC addresses. The helper tests every login from Kubernetes

@@ -79,10 +79,10 @@ spec:
           enableIntegration: false
         # Please change here: published images/charts; credentials stay private.
         images:
-          registry: harbor.runailabs-ps.com/nico
+          registry: registry.example.test/nico
           tag: v2.2.2
           pullSecret: imagepullsecret
-          dpuChartRepository: oci://harbor.runailabs-ps.com/nico
+          dpuChartRepository: oci://registry.example.test/nico
           dpuChartVersion: 2.2.2
           unboundRepository: CHANGE_ME
           unboundTag: CHANGE_ME

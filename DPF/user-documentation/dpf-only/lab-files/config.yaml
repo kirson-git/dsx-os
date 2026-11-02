@@ -12,7 +12,7 @@ spec:
     path: DPF/charts/site
     helm:
       valuesObject:
-        apiServerIP: 10.220.175.20
+        apiServerIP: 192.0.2.20
         vipInterface: enp7s0
         europeVIP: 192.168.0.200
         asiaVIP: 192.168.0.203

@@ -11,7 +11,7 @@ The image and chart registry must use the same hostname for this helper.
 
 ```bash
 install -d -m 700 "$HOME/nico-private/docker"
-docker --config "$HOME/nico-private/docker" login harbor.runailabs-ps.com
+docker --config "$HOME/nico-private/docker" login registry.example.test
 chmod 600 "$HOME/nico-private/docker/config.json"
 python3 NICo/scripts/private-bootstrap.py registry \
   --config "$HOME/nico-config.yaml" \

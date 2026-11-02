@@ -122,8 +122,8 @@ DPF's service Argo runs in `dpf-operator-system` and deploys DPU workloads.
 First ensure both boot-artifact images exist. The BFB build must finish:
 
 ```bash
-docker buildx imagetools inspect harbor.runailabs-ps.com/nico/boot-artifacts-x86_64:v2.2.2
-docker buildx imagetools inspect harbor.runailabs-ps.com/nico/boot-artifacts-aarch64:v2.2.2
+docker buildx imagetools inspect registry.example.test/nico/boot-artifacts-x86_64:v2.2.2
+docker buildx imagetools inspect registry.example.test/nico/boot-artifacts-aarch64:v2.2.2
 bash NICo/deploy.sh --config "$HOME/nico-config.yaml" --stage 6
 kubectl -n nico-system get pods
 ```

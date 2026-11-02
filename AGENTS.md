@@ -29,7 +29,7 @@
   verify retained CRDs separately. Preserve management Kubernetes and external
   Argo unless their deletion is explicitly requested.
 - Keep customer deployment files here and NICo source/build work in its own repo.
-  `nico-build-01` (`10.220.175.23`) is build-only, never for lab administration.
+  `build-host` (`192.0.2.23`) is build-only, never for lab administration.
 
 Package details: [DPF/Argo skill](.agents/skills/dsx-dpf-argo/SKILL.md).
 The user's latest instructions take precedence over these defaults.

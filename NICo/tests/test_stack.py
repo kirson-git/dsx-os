@@ -46,7 +46,7 @@ class StackTests(unittest.TestCase):
         self.assertEqual(source['targetRevision'],'80d131a5cd3280f9cef3131fa0c5647bdf3e79d0')
         t=tomllib.loads(v['nico-api']['siteConfig']['nicoApiSiteConfig'])
         self.assertTrue(t['dpf']['enabled'])
-        self.assertEqual(t['dpf']['services']['otel']['docker_repo_url'],'harbor.runailabs-ps.com/nico/otelcol-contrib')
+        self.assertEqual(t['dpf']['services']['otel']['docker_repo_url'],'registry.example.test/nico/otelcol-contrib')
         self.assertEqual(len(v['nico-pxe']['bootArtifactContainers']),2)
         self.assertEqual(v['nico-api']['webAuth']['basic']['existingSecret']['name'],'nico-api-web-basic-auth')
 

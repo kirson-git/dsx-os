@@ -66,7 +66,6 @@ These private files already exist locally; they are **not downloaded from Git**:
 | --- | --- |
 | `/tmp/dpf-lab/private/bmc-password` | DPU BMC password |
 | `/tmp/dpf-lab/private/idrac-password` | Server iDRAC password |
-| `/tmp/dpf-lab/passowrd-demo` | Private demo credential notes |
 
 Use the saved files instead of prompts:
 

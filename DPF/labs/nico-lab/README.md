@@ -10,7 +10,7 @@ remains a later step.
 
 | Setting | Value |
 | --- | --- |
-| Management API | `10.220.175.20:6443` |
+| Management API | `192.0.2.20:6443` |
 | Europe tenant VIP | `192.168.0.200` |
 | Asia tenant VIP | `192.168.0.203` |
 | Keepalived interface | `enp7s0` |

@@ -57,7 +57,7 @@ class DHCPChartTests(unittest.TestCase):
         self.assertEqual(deployment['spec']['strategy']['type'], 'Recreate')
         pod = deployment['spec']['template']
         self.assertTrue(pod['spec']['hostNetwork'])
-        self.assertEqual(pod['spec']['nodeSelector']['kubernetes.io/hostname'], 'l-ae-1137d-001')
+        self.assertEqual(pod['spec']['nodeSelector']['kubernetes.io/hostname'], 'mgmt-node-01')
         self.assertFalse(pod['spec']['automountServiceAccountToken'])
         image = pod['spec']['containers'][0]['image']
         self.assertIn('@sha256:', image)

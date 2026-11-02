@@ -11,13 +11,13 @@ spec:
     path: DPF/charts/site
     helm:
       valuesObject:
-        apiServerIP: 10.220.175.20  # please change here: existing Kubernetes API, port 6443
+        apiServerIP: 192.0.2.20  # please change here: existing Kubernetes API, port 6443
         vipInterface: enp7s0       # please change here: management-node interface for tenant VIPs
         europeVIP: 192.168.0.200   # please change here: reserved floating IP, outside DHCP
         asiaVIP: 192.168.0.203     # please change here: reserved floating IP, outside DHCP
         install-dhcp: "no"        # please change here: "yes" installs DHCP; arrange cutover first
         dhcp:
-          nodeName: l-ae-1137d-001 # please change here: node connected to DPU management network
+          nodeName: mgmt-node-01 # please change here: node connected to DPU management network
           interface: enp7s0       # please change here: DHCP-facing interface on that node
           serverIP: 192.168.0.129 # please change here: MUST be assigned to that node before enabling
           subnet: 192.168.0.128   # please change here: DHCP network address

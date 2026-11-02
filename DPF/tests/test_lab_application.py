@@ -34,7 +34,7 @@ class LabApplicationTests(unittest.TestCase):
                 self.assertNotEqual(obj['kind'], 'Secret')
             rendered.extend(objects)
         config = next(o for o in rendered if o['kind'] == 'DPFOperatorConfig')
-        self.assertEqual(config['spec']['overrides']['kubernetesAPIServerVIP'], '10.220.175.20')
+        self.assertEqual(config['spec']['overrides']['kubernetesAPIServerVIP'], '192.0.2.20')
         self.assertEqual(config['spec']['overrides']['kubernetesAPIServerPort'], 6443)
         for tenant, vip in [('europe', '192.168.0.200'), ('asia', '192.168.0.203')]:
             obj = next(o for o in rendered if o['kind'] == 'DPUCluster' and o['metadata']['name'] == 'tenant-' + tenant)

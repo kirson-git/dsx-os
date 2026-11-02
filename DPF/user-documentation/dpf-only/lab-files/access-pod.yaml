@@ -6,7 +6,7 @@ metadata:
   labels:
     app: dpf-hbn-recovery-access
 spec:
-  nodeName: l-ae-1137d-001
+  nodeName: mgmt-node-01
   hostNetwork: true
   dnsPolicy: ClusterFirstWithHostNet
   automountServiceAccountToken: false

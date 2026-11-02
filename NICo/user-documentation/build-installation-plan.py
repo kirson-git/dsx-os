@@ -62,7 +62,7 @@ h('Create a private environment file'),
 code(r'''install -d -m 700 "$HOME/nico-private"
 umask 077
 cat > "$HOME/nico-private/env-vars" <<'ENV'
-export NICO_IMAGE_REGISTRY=harbor.runailabs-ps.com/nico
+export NICO_IMAGE_REGISTRY=registry.example.test/nico
 export NICO_CORE_IMAGE_TAG=v2.2.2
 export NICO_STORAGE_CLASS=local-path-persistent
 export NICO_MANAGE_DEFAULT_STORAGE_CLASS=false

@@ -43,7 +43,7 @@ vi "$LAB/30-hbn-application.yaml"
 vi "$LAB/40-provisioning-application.yaml"'''),
  p('The ZIP contains every local file referenced by this guide. unzip -n preserves previous edits. Argo sources are pinned to repository revision 96b35f7. The settings below are lab examples: replace them for your site.'),
  table([['Setting','Asia','Europe'],['Tenant API VIP (manual)','192.168.0.203','192.168.0.200'],['DPU BMC / Redfish','192.168.0.249','192.168.0.246'],['DPU OS management (DHCP)','192.168.0.242','192.168.0.244'],['Ubuntu management SSH','root@192.168.0.232','ubuntu@192.168.0.231'],['Ubuntu HBN data address','10.0.0.1/24','10.0.0.2/24'],['HBN VRF / L3 VNI','ASIA / 100002','EUROPE / 100001']]),
- p('config.yaml: API 10.220.175.20:6443; VIP interface enp7s0; install-dhcp: "no". Existing lab DHCP is on l-ae-1137d (192.168.0.129). Reserve tenant VIPs outside DHCP. Each HBN network uses gateway 10.0.0.254.'),
+ p('config.yaml: API 192.0.2.20:6443; VIP interface enp7s0; install-dhcp: "no". Existing lab DHCP is on mgmt-host (192.168.0.129). Reserve tenant VIPs outside DHCP. Each HBN network uses gateway 10.0.0.254.'),
  p('30-hbn: edit hostname patterns, node selector, VRF, ASN, VNI and pools. 40-provisioning: edit device serials, BMC IPs/labels/selectors, node names, OPN/PSID, BFB and DNS. Keep matching references consistent. Passwords go in a private file in Step 5.'))
 
 page('Step 2 | Install external Argo CD','Skip this installation if external Argo already exists with the repository health settings.',
@@ -106,7 +106,7 @@ vi "$HOME/.config/dpf-lab/bmc-credentials"'''),
 password=YOUR_BMC_PASSWORD'''),
  code('''bash "$LAB/credentials.sh" --ip 192.168.0.246,192.168.0.249 \\
   --bmc-pass "$HOME/.config/dpf-lab/bmc-credentials" \\
-  --node l-ae-1137d-001 --insecure-bmc
+  --node mgmt-node-01 --insecure-bmc
 kubectl -n dpf-operator-system get secret bmc-shared-password'''),
  p('The helper tests both Redfish logins from a Kubernetes pod before saving the Secret. --insecure-bmc is only for this self-signed lab. The BMC password is separate from Ubuntu/DPU SSH credentials.'))
 

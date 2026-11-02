@@ -95,7 +95,7 @@ Review the lines marked `# please change here`:
 
 | Setting | What it means |
 | --- | --- |
-| `apiServerIP` | Existing management Kubernetes API; our lab uses `10.220.175.20:6443` |
+| `apiServerIP` | Existing management Kubernetes API; our lab uses `192.0.2.20:6443` |
 | `vipInterface` | Management-node interface carrying tenant VIPs; lab `enp7s0` |
 | `europeVIP` / `asiaVIP` | Reserved floating IPs `.200` / `.203`; never DHCP allocations |
 | `install-dhcp` | Quoted `"no"` uses existing DHCP; quoted `"yes"` installs the DHCP pod |
@@ -135,7 +135,7 @@ reservations for BMCs, iDRACs and Asia's host management NIC. Tenant VIPs are ma
 `apiServerIP` points to an existing API; this chart does not create a management
 API VIP. For HA, supply an existing load-balanced Kubernetes API endpoint.
 
-Our existing DHCP is dnsmasq (`nico-lab-dhcp`) on `l-ae-1137d`, configuration
+Our existing DHCP is dnsmasq (`nico-lab-dhcp`) on `mgmt-host`, configuration
 `/etc/nico-lab-dhcp.conf`. Its DHCP server address is `192.168.0.129`.
 The Kubernetes option is disabled until that service and address are migrated.
 See [DHCP settings and NICo differences](DHCP.md).

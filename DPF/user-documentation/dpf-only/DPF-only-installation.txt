@@ -47,7 +47,7 @@ Ubuntu management SSH | root@192.168.0.232 | ubuntu@192.168.0.231
 Ubuntu HBN data address | 10.0.0.1/24 | 10.0.0.2/24
 HBN VRF / L3 VNI | ASIA / 100002 | EUROPE / 100001
 
-config.yaml: API 10.220.175.20:6443; VIP interface enp7s0; install-dhcp: "no". Existing lab DHCP is on l-ae-1137d (192.168.0.129). Reserve tenant VIPs outside DHCP. Each HBN network uses gateway 10.0.0.254.
+config.yaml: API 192.0.2.20:6443; VIP interface enp7s0; install-dhcp: "no". Existing lab DHCP is on mgmt-host (192.168.0.129). Reserve tenant VIPs outside DHCP. Each HBN network uses gateway 10.0.0.254.
 
 30-hbn: edit hostname patterns, node selector, VRF, ASN, VNI and pools. 40-provisioning: edit device serials, BMC IPs/labels/selectors, node names, OPN/PSID, BFB and DNS. Keep matching references consistent. Passwords go in a private file in Step 5.
 
@@ -135,7 +135,7 @@ password=YOUR_BMC_PASSWORD
 
 bash "$LAB/credentials.sh" --ip 192.168.0.246,192.168.0.249 \
   --bmc-pass "$HOME/.config/dpf-lab/bmc-credentials" \
-  --node l-ae-1137d-001 --insecure-bmc
+  --node mgmt-node-01 --insecure-bmc
 kubectl -n dpf-operator-system get secret bmc-shared-password
 
 The helper tests both Redfish logins from a Kubernetes pod before saving the Secret. --insecure-bmc is only for this self-signed lab. The BMC password is separate from Ubuntu/DPU SSH credentials.

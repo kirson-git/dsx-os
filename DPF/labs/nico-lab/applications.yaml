@@ -22,7 +22,7 @@ spec:
         patch: |
           - op: replace
             path: /spec/overrides/kubernetesAPIServerVIP
-            value: 10.220.175.20
+            value: 192.0.2.20
           - op: replace
             path: /spec/overrides/kubernetesAPIServerPort
             value: 6443

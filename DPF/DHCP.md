@@ -45,8 +45,8 @@ NIC. Keep all seven local reservations if retiring that service. Do not move onl
 the two DPU entries and abandon the other clients.
 
 The current DHCP identity is `192.168.0.129` on the administration server's
-`enp59s0f0np0`. Kubernetes node `l-ae-1137d-001` has `192.168.0.101/24` on `enp7s0`.
-The VMs use corporate DHCP on `enp1s0` for `10.220.175.20`–`.22`;
+`enp59s0f0np0`. Kubernetes node `mgmt-node-01` has `192.168.0.101/24` on `enp7s0`.
+The VMs use corporate DHCP on `enp1s0` for `192.0.2.20`–`.22`;
 their `enp7s0` addresses `.101`–`.103` are static. Corporate DHCP is separate
 and must remain in place. The existing DPU DHCP subnet is `/25`: starting a
 pod on `.101` does not
