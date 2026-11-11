@@ -1,0 +1,8 @@
+# Runtime output of the installer: never commit these.
+state/
+logs/
+logs-discovery/
+.tools/
+.venv/
+__pycache__/
+*.pyc

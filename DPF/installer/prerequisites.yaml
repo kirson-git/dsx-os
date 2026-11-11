@@ -1,0 +1,15 @@
+# Reference inventory, NOT a Helm values file or an apply-ready manifest.
+# https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites
+dpfVersion: v26.4.0
+sourceTag: v26.4.0
+sourceDirectory: deploy/helmfiles
+requiredBeforeDPF:
+  cert-manager: v1.19.3
+  argo-cd: 9.4.1
+  node-feature-discovery: 0.18.3
+  maintenance-operator: 0.3.0
+defaultTopologyBeforeDPF:
+  kamaji: 1.2.0
+  local-path-provisioner: 0.0.34
+# Reuse/replace decisions require reviewing the upstream values and existing
+# resources. Optional observability is a later stage, after the DPF operator.
