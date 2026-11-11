@@ -36,7 +36,7 @@ spec:
                   dpuDeviceSelector:
                     matchLabels:
                       provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.249
-                      provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517601zfk
+                      provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-asia
                   dpuNodeSelector:
                     matchLabels:
                       feature.node.kubernetes.io/dpu-enabled: 'true'
@@ -93,17 +93,17 @@ spec:
               bmcPort: 443
               numberOfPFs: 1
               opn: 900-9D3B4-00CV-EA0
-              serialNumber: MT2517601ZFK
+              serialNumber: EXAMPLEASIA
           - op: replace
             path: /metadata/name
-            value: mt2517601zfk
+            value: example-asia
           - op: add
             path: /metadata/labels
             value:
               provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.249
               provisioning.dpu.nvidia.com/dpudevice-opn: 900-9D3B4-00CV-EA0
-              provisioning.dpu.nvidia.com/dpudevice-psid: MT2517601ZFK
-              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517601zfk
+              provisioning.dpu.nvidia.com/dpudevice-psid: EXAMPLEASIA
+              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-asia
         target:
           group: provisioning.dpu.nvidia.com
           kind: DPUDevice
@@ -117,17 +117,17 @@ spec:
               bmcPort: 443
               numberOfPFs: 1
               opn: 900-9D3B4-00CV-EA0
-              serialNumber: MT2517602MD3
+              serialNumber: EXAMPLEEUROPE
           - op: replace
             path: /metadata/name
-            value: mt2517602md3
+            value: example-europe
           - op: add
             path: /metadata/labels
             value:
               provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.246
               provisioning.dpu.nvidia.com/dpudevice-opn: 900-9D3B4-00CV-EA0
-              provisioning.dpu.nvidia.com/dpudevice-psid: MT2517602MD3
-              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517602md3
+              provisioning.dpu.nvidia.com/dpudevice-psid: EXAMPLEEUROPE
+              provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-europe
         target:
           group: provisioning.dpu.nvidia.com
           kind: DPUDevice
@@ -365,12 +365,12 @@ spec:
             path: /spec
             value:
               dpus:
-              - name: mt2517601zfk
+              - name: example-asia
               nodeRebootMethod:
                 external: {}
           - op: replace
             path: /metadata/name
-            value: dpu-node-mt2517601zfk
+            value: dpu-node-example-asia
           - op: add
             path: /metadata/labels
             value:
@@ -387,12 +387,12 @@ spec:
             path: /spec
             value:
               dpus:
-              - name: mt2517602md3
+              - name: example-europe
               nodeRebootMethod:
                 external: {}
           - op: replace
             path: /metadata/name
-            value: dpu-node-mt2517602md3
+            value: dpu-node-example-europe
           - op: add
             path: /metadata/labels
             value:
@@ -411,7 +411,7 @@ spec:
               dpuDeviceSelector:
                 matchLabels:
                   provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.168.0.246
-                  provisioning.dpu.nvidia.com/dpunode-name: dpu-node-mt2517602md3
+                  provisioning.dpu.nvidia.com/dpunode-name: dpu-node-example-europe
               dpuNodeSelector:
                 matchLabels:
                   feature.node.kubernetes.io/dpu-enabled: 'true'

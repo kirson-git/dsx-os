@@ -26,7 +26,7 @@ spec:
                   version: 3.4.0
                 values:
                   configuration:
-                    perDPUValuesYAML: "- hostnamePattern: dpu-node-mt2517602md3*\n  values:\n\
+                    perDPUValuesYAML: "- hostnamePattern: dpu-node-example-europe*\n  values:\n\
                       \    bgp_peer_group: hbn\n    vrf1: EUROPE\n    l3vni1: 100001\n    bgp_autonomous_system:\
                       \ 65101\n"
                     startupYAMLJ2: "- header:\n    model: bluefield\n    nvue-api-version: nvue_v1\n\
@@ -89,7 +89,7 @@ spec:
                     - key: kubernetes.io/hostname
                       operator: In
                       values:
-                      - dpu-node-mt2517602md3-mt2517602md3
+                      - dpu-node-example-europe-example-europe
               serviceID: doca-hbn-europe
         target:
           group: svc.dpu.nvidia.com
@@ -159,7 +159,7 @@ spec:
                 helmChart:
                   values:
                     configuration:
-                      perDPUValuesYAML: "- hostnamePattern: dpu-node-mt2517601zfk*\n  values:\n\
+                      perDPUValuesYAML: "- hostnamePattern: dpu-node-example-asia*\n  values:\n\
                         \    bgp_peer_group: hbn\n    vrf1: ASIA\n    l3vni1: 100002\n    bgp_autonomous_system:\
                         \ 65201\n"
                       startupYAMLJ2: "- header:\n    model: bluefield\n    nvue-api-version:\
