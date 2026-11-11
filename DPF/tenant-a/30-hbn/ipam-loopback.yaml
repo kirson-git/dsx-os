@@ -1,0 +1,14 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: tenant-a-loopback
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '80'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: tenant-a
+  ipv4Network:
+    network: 10.60.0.10/32
+    prefixSize: 32

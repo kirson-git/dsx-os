@@ -1,0 +1,22 @@
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceInterface
+metadata:
+  name: tenant-a-p1
+  namespace: dpf-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: '80'
+spec:
+  dpuClusterSelector:
+    matchLabels:
+      training.dpf.nvidia.com/tenant: tenant-a
+  template:
+    spec:
+      template:
+        metadata:
+          labels:
+            interface: p1
+            training.dpf.nvidia.com/tenant: tenant-a
+        spec:
+          interfaceType: physical
+          physical:
+            interfaceName: p1

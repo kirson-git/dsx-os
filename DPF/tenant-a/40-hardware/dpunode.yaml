@@ -1,0 +1,16 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUNode
+metadata:
+  name: dpu-node-tenant-a
+  namespace: dpf-operator-system
+  labels:
+    feature.node.kubernetes.io/dpu-enabled: 'true'
+    training.dpf.nvidia.com/selected: 'true'
+    training.dpf.nvidia.com/tenant: tenant-a
+  annotations:
+    argocd.argoproj.io/sync-wave: '91'
+spec:
+  dpus:
+  - name: tenant-a-dpu1
+  nodeRebootMethod:
+    external: {}

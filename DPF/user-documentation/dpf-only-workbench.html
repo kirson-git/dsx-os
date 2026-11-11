@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DPF Only Workbench</title>
+<style>
+  /* Layout: step rail | step text + commands + simulated terminal | one diagram that lights up as steps complete. */
+  :root {
+    --paper:#171b1b; --panel:#1e2423; --panel2:#222827; --ink:#edf3ed; --dim:#a6b4aa; --line:#3b463e; --lime:#b0e85f; --nv:#76b900;
+    --term-bg:#0f1516; --term-fg:#dbe8db; --term-line:#2b3733; --term-prompt:#ade45d; --term-dim:#7f9185;
+    --box:#1a2620; --box-line:#4f6358; --fabric:#3cc3d1; --uplink:#a98bf0; --hostlink:#f0a03c; --oob:#8fa097;
+    --ok:#6fcf74; --warn:#f0a03c; --edit:#f0a03c;
+    --fur:#9be015; --fur-light:#f6ffe0; --fur-dark:#4f8a00;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --paper:#f4f6f3; --panel:#ffffff; --panel2:#f7f9f6; --ink:#192321; --dim:#58665e; --line:#d6ded8; --lime:#507600; --nv:#76b900;
+    --term-bg:#101718; --term-fg:#dbe8db; --term-line:#2b3733; --term-prompt:#ade45d; --term-dim:#7f9185;
+    --box:#ffffff; --box-line:#8a9990; --fabric:#0b7f8c; --uplink:#6a3fc4; --hostlink:#c26a00; --oob:#6b7a72;
+    --ok:#2f7d32; --warn:#b26a00; --edit:#b26a00;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+    --paper:#f4f6f3; --panel:#ffffff; --panel2:#f7f9f6; --ink:#192321; --dim:#58665e; --line:#d6ded8; --lime:#507600; --nv:#76b900;
+    --term-bg:#101718; --term-fg:#dbe8db; --term-line:#2b3733; --term-prompt:#ade45d; --term-dim:#7f9185;
+    --box:#ffffff; --box-line:#8a9990; --fabric:#0b7f8c; --uplink:#6a3fc4; --hostlink:#c26a00; --oob:#6b7a72;
+    --ok:#2f7d32; --warn:#b26a00; --edit:#b26a00;
+    color-scheme: light;
+  } }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { background:var(--paper); color:var(--ink); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--lime); outline-offset:2px; }
+  .mono, code, pre { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  [hidden] { display:none !important; }
+
+  .app { display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:100%; }
+  .top { display:flex; align-items:center; gap:14px; padding:11px 18px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  .brand { font-weight:700; letter-spacing:.08em; font-size:13px; display:flex; align-items:center; gap:10px; white-space:nowrap; }
+  .brand:before { content:''; width:8px; height:19px; background:var(--nv); display:inline-block; }
+  .course { color:var(--dim); font-size:13px; } .course b { color:var(--ink); font-weight:600; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pill { font-size:12px; border:1px solid var(--line); border-radius:999px; padding:4px 11px; color:var(--dim); background:var(--panel2); white-space:nowrap; }
+  .pill.sim { color:var(--warn); border-color:var(--warn); }
+  .ghost { background:transparent; border:1px solid var(--line); border-radius:6px; padding:5px 10px; font-size:12px; color:var(--dim); }
+  .ghost:hover { color:var(--ink); border-color:var(--dim); }
+  .ghost.on { color:#101700; background:var(--nv); border-color:var(--nv); font-weight:600; }
+
+  .body { display:grid; grid-template-columns:236px minmax(320px,1fr) minmax(380px,40%); min-height:0; }
+  .rail { border-right:1px solid var(--line); background:var(--panel); padding:16px; overflow:auto; font-size:12.5px; }
+  .eyebrow { font-size:11px; letter-spacing:.13em; color:var(--lime); font-weight:700; text-transform:uppercase; }
+  .rail .eyebrow { display:block; padding:0 6px 6px; }
+  .acthead { display:flex; align-items:baseline; gap:8px; padding:12px 6px 4px; color:var(--dim); }
+  .acthead b { color:var(--ink); font-weight:600; } .acthead small { font-size:11px; }
+  .step { display:flex; gap:8px; align-items:center; width:100%; text-align:left; background:none; border:0; border-left:2px solid var(--line); padding:6px 8px 6px 10px; color:var(--dim); font-size:12.5px; }
+  .step:hover { color:var(--ink); background:color-mix(in srgb,var(--ink) 4%,transparent); }
+  .step .mark { width:12px; text-align:center; flex:none; }
+  .step.done .mark { color:var(--ok); }
+  .step.cur { color:var(--lime); border-color:var(--lime); background:color-mix(in srgb,var(--lime) 10%,transparent); }
+  .step .tag { margin-left:auto; font-size:10px; letter-spacing:.06em; color:var(--edit); border:1px solid var(--edit); border-radius:4px; padding:0 4px; }
+  .meter { height:4px; background:var(--line); border-radius:3px; margin:16px 6px 8px; overflow:hidden; }
+  .meter span { display:block; height:100%; width:0; background:var(--nv); transition:width .3s; }
+  .rail .meta { color:var(--dim); padding:0 6px; font-size:11.5px; }
+
+  .main { display:grid; grid-template-rows:minmax(0,1fr) minmax(150px,26%); min-height:0; min-width:0; }
+  .work { padding:20px 22px 16px; min-width:0; overflow:auto; }
+  .work h2 { font:600 25px/1.18 system-ui; letter-spacing:-.5px; margin:6px 0 10px; text-wrap:balance; }
+  .work p { margin:0 0 10px; color:var(--dim); max-width:72ch; }
+  .work p b, .work li b { color:var(--ink); font-weight:600; }
+  .work ul { margin:0 0 10px; padding-left:18px; color:var(--dim); max-width:72ch; }
+  .work code { font-size:.92em; background:color-mix(in srgb,var(--ink) 8%,transparent); padding:1px 6px; border-radius:4px; color:var(--ink); }
+  .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  .btn { border:1px solid var(--line); background:var(--panel); border-radius:6px; padding:8px 15px; font-weight:500; font-size:13px; min-height:36px; }
+  .btn.primary { background:var(--nv); border-color:var(--nv); color:#101700; font-weight:700; }
+  .btn:disabled { opacity:.55; cursor:default; }
+  .btn:hover:not(:disabled) { filter:brightness(1.08); }
+  .expect { color:var(--dim); font-size:12.5px; } .expect b { color:var(--ink); font-weight:600; }
+  .hint { font-size:12.5px; color:var(--dim); padding:10px 12px; border-left:2px solid var(--lime); background:color-mix(in srgb,var(--lime) 7%,transparent); border-radius:0 6px 6px 0; margin-top:10px; max-width:72ch; }
+  .result { font-size:12.5px; color:var(--ok); margin-top:10px; min-height:1.2em; }
+  .lbl { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-top:14px; font-weight:700; display:flex; gap:10px; align-items:center; }
+  .codebox { position:relative; margin:6px 0 0; background:var(--term-bg); color:var(--term-fg); border:1px solid var(--term-line); border-radius:8px; padding:10px 70px 10px 12px; font:12.5px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; }
+  .codebox .p { color:var(--term-prompt); } .codebox .cm { color:var(--term-dim); }
+  .copy { position:absolute; top:6px; right:6px; font:12px system-ui; border:1px solid #34413d; background:transparent; color:#a5b6aa; border-radius:6px; padding:2px 8px; }
+  .copy:hover { color:#fff; }
+  .yaml .ed { background:color-mix(in srgb,var(--edit) 20%,transparent); border-left:2px solid var(--edit); margin-left:-12px; padding-left:10px; display:block; }
+  .yaml .ed b { color:#fff; } .yaml .arrow { color:var(--edit); font-family:system-ui; font-size:11.5px; }
+  .yaml .k { color:var(--term-dim); }
+  .filepath { color:var(--ink); text-transform:none; letter-spacing:0; font:600 12.5px ui-monospace,Menlo,monospace; }
+  .note { font-size:12px; color:var(--dim); margin-top:6px; max-width:72ch; }
+  table.vals { border-collapse:collapse; margin:6px 0 10px; font-size:12.5px; }
+  table.vals td { padding:3px 14px 3px 0; color:var(--dim); vertical-align:top; } table.vals td:first-child { color:var(--ink); font-family:ui-monospace,Menlo,monospace; white-space:nowrap; }
+
+  .banner { border:1px solid var(--nv); background:color-mix(in srgb,var(--nv) 14%,transparent); border-radius:8px; padding:12px 14px; margin:0 0 12px; max-width:72ch; color:var(--dim); }
+  .banner .big { display:block; font:800 20px/1.1 system-ui; letter-spacing:.04em; color:var(--lime); margin-bottom:6px; }
+  .banner b { color:var(--ink); }
+  table.info { border-collapse:collapse; margin:8px 0 4px; font-size:12.5px; max-width:78ch; }
+  table.info td { padding:5px 12px 5px 0; vertical-align:top; color:var(--dim); border-top:1px solid var(--line); }
+  table.info td:first-child { color:var(--ink); font-family:ui-monospace,Menlo,monospace; white-space:nowrap; }
+  .scene { display:block; width:100%; max-width:560px; height:auto; margin:4px 0 10px; }
+  .scene .sb { fill:var(--box); stroke:var(--box-line); stroke-width:1.4; }
+  .scene .sb.hot { stroke:var(--lime); stroke-width:2.2; }
+  .scene .sl { stroke-width:3; fill:none; } .scene .sl.host { stroke:var(--hostlink); } .scene .sl.vx { stroke:var(--fabric); } .scene .sl.ctl { stroke:var(--oob); stroke-dasharray:4 4; stroke-width:2; }
+  .codebox.tall { max-height:300px; overflow:auto; }
+  .terminal { display:grid; grid-template-rows:auto minmax(0,1fr); background:var(--term-bg); color:var(--term-fg); border-top:1px solid var(--term-line); min-height:0; }
+  .termhead { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--term-line); font-size:12px; color:#a5b6aa; }
+  .termhead .target { color:#dbe8db; font-weight:600; white-space:nowrap; } .termhead .target:before { content:'⌨'; margin-right:7px; color:var(--term-prompt); }
+  .termhead .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .termhead .pill { background:transparent; }
+  pre.term { margin:0; padding:12px 16px; overflow:auto; font:12.5px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+  pre.term .p { color:var(--term-prompt); } pre.term .c { color:#fff; font-weight:600; } pre.term .d { color:var(--term-dim); } pre.term .ok { color:var(--ok); } pre.term .warn { color:var(--warn); }
+  .cursor { display:inline-block; width:8px; height:14px; background:var(--term-prompt); vertical-align:-2px; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  .topo { border-left:1px solid var(--line); background:var(--panel); display:grid; grid-template-rows:auto minmax(0,1fr) auto auto; min-width:0; min-height:0; }
+  .topohead { padding:14px 18px 4px; display:flex; align-items:baseline; gap:12px; }
+  .topohead h3 { margin:0; font:600 15px system-ui; } .topohead .meta { color:var(--dim); font-size:12px; margin-left:auto; }
+  .diagram { padding:4px 10px; min-height:0; background-image:radial-gradient(color-mix(in srgb,var(--ink) 9%,transparent) 1px,transparent 1px); background-size:18px 18px; display:flex; align-items:center; }
+  .diagram svg { display:block; width:100%; height:100%; }
+  svg text { font-family:system-ui,sans-serif; fill:var(--ink); font-size:12px; }
+  svg .small { font-size:10.5px; fill:var(--dim); }
+  svg .st { font-size:10.5px; fill:var(--dim); font-family:ui-monospace,Menlo,monospace; }
+  .node rect { fill:var(--box); stroke:var(--box-line); stroke-width:1.4; transition:stroke .25s, opacity .25s; }
+  .node { transition:opacity .25s; }
+  .node.hot rect { stroke:var(--lime); stroke-width:2.4; filter:drop-shadow(0 0 6px color-mix(in srgb,var(--lime) 60%,transparent)); }
+  .node.ok rect { stroke:var(--ok); } .node.ok .st { fill:var(--ok); }
+  .node.wait rect { stroke:var(--warn); stroke-dasharray:5 4; } .node.wait .st { fill:var(--warn); }
+  .zone { fill:none; stroke:var(--line); stroke-width:1.4; stroke-dasharray:6 5; }
+  .link { fill:none; stroke-width:2; opacity:.25; transition:opacity .3s; }
+  .link.on { opacity:1; }
+  .l-ctl { stroke:var(--oob); stroke-dasharray:4 4; } .l-img { stroke:var(--uplink); } .l-join { stroke:var(--ok); } .l-vx { stroke:var(--fabric); stroke-width:3; } .l-host { stroke:var(--hostlink); stroke-width:3; }
+  .link.flow { stroke-dasharray:7 6; animation:flow 1s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-13; } }
+  .dimmed { opacity:.45; }
+  .here { padding:8px 120px 10px 18px; border-top:1px solid var(--line); display:grid; gap:2px; font-size:12.5px; }
+  .here .row { display:flex; gap:10px; align-items:baseline; } .here .k { color:var(--dim); width:70px; flex:none; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 12px; padding:0 120px 10px 18px; font-size:11.5px; color:var(--dim); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; } .dot { width:14px; height:3px; display:inline-block; border-radius:2px; }
+
+  .foot { border-top:1px solid var(--line); padding:8px 18px; display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--dim); background:var(--panel); flex-wrap:wrap; }
+
+  /* the guide bot */
+  .bot { position:fixed; right:14px; bottom:40px; z-index:50; display:flex; align-items:flex-end; gap:8px; }
+  .quip { position:relative; max-width:300px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:14px 14px 4px 14px; padding:9px 13px; font-size:13px; line-height:1.4; box-shadow:0 8px 24px rgba(0,0,0,.35); opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .2s, transform .2s; }
+  .quip.show { opacity:1; transform:none; pointer-events:auto; }
+  .quip small { display:block; color:var(--dim); font-size:11.5px; margin-top:4px; }
+  .furry { width:84px; height:84px; cursor:pointer; background:none; border:0; padding:0; filter:drop-shadow(0 0 12px rgba(155,224,21,.55)) drop-shadow(0 8px 14px rgba(0,0,0,.45)); }
+  .furry svg { width:100%; height:100%; overflow:visible; display:block; }
+  .furry .body { animation:bob 3.2s ease-in-out infinite; }
+  @keyframes bob { 50% { transform:translateY(-3px); } }
+  .furry .eye { animation:wink 4.5s infinite; transform-box:fill-box; transform-origin:center; }
+  @keyframes wink { 0%,92%,100% { transform:scaleY(1); } 95% { transform:scaleY(.08); } }
+  .furry.excited .body { animation:hop .55s ease-out; }
+  @keyframes hop { 30% { transform:translateY(-12px) rotate(-4deg); } 60% { transform:translateY(0) rotate(3deg); } }
+  .guide { position:fixed; right:14px; bottom:134px; z-index:60; width:min(400px,calc(100vw - 28px)); max-height:min(70vh,620px); display:grid; grid-template-rows:auto minmax(0,1fr) auto; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.5); overflow:hidden; }
+  .guide header { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .guide header b { font-size:13.5px; } .guide header .x { margin-left:auto; }
+  .chat { padding:12px 14px; overflow:auto; display:grid; gap:10px; align-content:start; font-size:13px; }
+  .msg { max-width:92%; padding:8px 11px; border-radius:10px; line-height:1.45; }
+  .msg.them { background:var(--panel2); border:1px solid var(--line); justify-self:start; }
+  .msg.me { background:color-mix(in srgb,var(--nv) 22%,transparent); border:1px solid color-mix(in srgb,var(--nv) 50%,transparent); justify-self:end; }
+  .msg code { background:color-mix(in srgb,var(--ink) 10%,transparent); padding:1px 5px; border-radius:4px; font-size:.92em; overflow-wrap:anywhere; }
+  .msg ul { margin:4px 0 0; padding-left:18px; } .msg small { color:var(--dim); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { font-size:12px; border:1px solid var(--line); background:transparent; border-radius:999px; padding:4px 10px; color:var(--dim); }
+  .chip:hover { color:var(--ink); border-color:var(--lime); }
+  .ask { display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }
+  .ask input { flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; color:var(--ink); font:inherit; font-size:13px; }
+
+  /* site values drawer */
+  .drawer { position:fixed; inset:0 0 0 auto; width:min(440px,100vw); z-index:70; background:var(--panel); border-left:1px solid var(--line); box-shadow:-18px 0 50px rgba(0,0,0,.45); display:grid; grid-template-rows:auto minmax(0,1fr) auto; }
+  .drawer header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .drawer header b { font-size:15px; } .drawer header .x { margin-left:auto; }
+  .drawer .fields { padding:14px 18px; overflow:auto; display:grid; gap:10px; align-content:start; }
+  .fld { display:grid; gap:3px; } .fld label { font-size:12px; color:var(--dim); } .fld label b { color:var(--ink); font-weight:600; }
+  .fld input { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:7px 9px; color:var(--ink); font:13px ui-monospace,Menlo,monospace; }
+  .fld input.changed { border-color:var(--nv); }
+  .drawer footer { padding:12px 18px; border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; font-size:12px; color:var(--dim); }
+  .grp { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--lime); font-weight:700; margin-top:6px; }
+
+  @media (max-width: 1080px) {
+    .app { height:auto; min-height:100%; }
+    .body { grid-template-columns:1fr; }
+    .rail { border-right:0; border-bottom:1px solid var(--line); max-height:220px; }
+    .main { grid-template-rows:auto 260px; }
+    .topo { border-left:0; border-top:1px solid var(--line); }
+    .diagram { min-height:420px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <span class="brand">DPF / WORKBENCH</span>
+    <span class="course"><b>DPF only</b> · DPU + HBN + VXLAN, step by step</span>
+    <div class="right">
+      <span class="pill sim" title="Commands are real. The terminal output is simulated so you can rehearse without a cluster.">simulated terminal</span>
+      <button class="ghost" id="valbtn" type="button">Site values</button>
+      <button class="ghost" id="theme" type="button">Light</button>
+      <button class="ghost" id="reset" type="button">Reset progress</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="rail" aria-label="steps">
+      <span class="eyebrow">Install path</span>
+      <div id="acts"></div>
+      <div class="meter"><span id="meter"></span></div>
+      <div class="meta mono" id="progress"></div>
+    </aside>
+
+    <div class="main">
+      <main class="work">
+        <span class="eyebrow" id="eyebrow"></span>
+        <h2 id="title"></h2>
+        <div id="bannerbox"></div>
+        <div id="text"></div>
+        <div id="scenebox"></div>
+        <div id="filebox"></div>
+        <div id="infobox"></div>
+        <div id="codesbox"></div>
+        <div id="cmdbox"></div>
+        <div class="actions">
+          <button class="btn primary" id="run" type="button">Run</button>
+          <button class="btn" id="hintbtn" type="button">Hint</button>
+          <button class="btn" id="next" type="button" hidden>Next step →</button>
+          <span class="expect" id="expect"></span>
+        </div>
+        <div class="hint" id="hint" hidden></div>
+        <div class="result" id="result" role="status" aria-live="polite"></div>
+      </main>
+      <section class="terminal" aria-label="simulated terminal">
+        <div class="termhead">
+          <span class="target" id="ttarget">admin terminal</span>
+          <div class="right"><span class="pill sim">simulated output</span><button class="ghost" id="clear" type="button">Clear</button></div>
+        </div>
+        <pre class="term" id="term"></pre>
+      </section>
+    </div>
+
+    <aside class="topo" aria-label="diagram">
+      <div class="topohead"><h3>What exists so far</h3><span class="meta" id="topometa"></span></div>
+      <div class="diagram">
+        <svg id="svg" viewBox="0 0 560 660" role="img" aria-label="Path from the admin terminal through the management cluster and the DPU BMC to a DPU that runs HBN and carries VXLAN to the switch">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <!-- links first, so nodes sit on top -->
+          <path class="link l-ctl" id="l-admin" d="M280,58 V92"/>
+          <path class="link l-ctl" id="l-pre-op" d="M150,170 H196"/>
+          <path class="link l-ctl" id="l-op-cluster" d="M300,198 V232"/>
+          <path class="link l-ctl" id="l-op-secret" d="M404,170 H424"/>
+          <path class="link l-ctl" id="l-objs" d="M150,292 V326"/>
+          <path class="link l-img" id="l-redfish" d="M300,356 V426 H398 V452"/>
+          <path class="link l-join" id="l-join" d="M470,452 V262 H404"/>
+          <path class="link l-host" id="l-host" d="M160,548 H286"/>
+          <path class="link l-vx" id="l-vx" d="M406,592 V622"/>
+          <!-- admin -->
+          <g class="node" id="n-admin"><rect x="150" y="14" width="260" height="44" rx="8"/><text x="280" y="33" text-anchor="middle">admin terminal</text><text class="small" x="280" y="48" text-anchor="middle">dpf-install.sh + kubectl</text></g>
+          <!-- management cluster -->
+          <rect class="zone" x="14" y="92" width="532" height="296" rx="12"/><text class="small" x="26" y="110">management Kubernetes cluster</text>
+          <g class="node" id="n-pre"><rect x="30" y="142" width="120" height="56" rx="8"/><text x="90" y="163" text-anchor="middle">prerequisites</text><text class="st" id="s-pre" x="90" y="183" text-anchor="middle">missing</text></g>
+          <g class="node" id="n-op"><rect x="196" y="142" width="208" height="56" rx="8"/><text x="300" y="163" text-anchor="middle">DPF operator v26.4.0</text><text class="st" id="s-op" x="300" y="183" text-anchor="middle">missing</text></g>
+          <g class="node" id="n-secret"><rect x="424" y="142" width="108" height="56" rx="8"/><text x="478" y="163" text-anchor="middle">BMC Secret</text><text class="st" id="s-secret" x="478" y="183" text-anchor="middle">missing</text></g>
+          <g class="node" id="n-cluster"><rect x="196" y="232" width="208" height="60" rx="8"/><text x="300" y="253" text-anchor="middle">tenant cluster tenant-a</text><text class="st" id="s-cluster" x="300" y="273" text-anchor="middle">not created</text></g>
+          <g class="node" id="n-hbndef"><rect x="30" y="232" width="150" height="60" rx="8"/><text x="105" y="253" text-anchor="middle">HBN + VXLAN objects</text><text class="st" id="s-hbndef" x="105" y="273" text-anchor="middle">not applied</text></g>
+          <g class="node" id="n-hw"><rect x="30" y="326" width="374" height="46" rx="8"/><text x="217" y="345" text-anchor="middle">hardware objects: device, image, deployment</text><text class="st" id="s-hw" x="217" y="362" text-anchor="middle">not applied</text></g>
+          <!-- server -->
+          <rect class="zone" x="14" y="426" width="532" height="180" rx="12"/><text class="small" x="26" y="444">one server</text>
+          <g class="node" id="n-host"><rect x="30" y="518" width="130" height="60" rx="8"/><text x="95" y="542" text-anchor="middle">host</text><text class="st" id="s-host" x="95" y="560" text-anchor="middle">no gateway yet</text></g>
+          <g class="node" id="n-bmc"><rect x="340" y="452" width="116" height="40" rx="8"/><text x="398" y="470" text-anchor="middle">DPU BMC</text><text class="st" id="s-bmc" x="398" y="484" text-anchor="middle">untested</text></g>
+          <g class="node" id="n-dpu"><rect x="286" y="506" width="246" height="86" rx="8"/><text x="409" y="524" text-anchor="middle">DPU (BlueField)</text><text class="st" id="s-dpu" x="409" y="540" text-anchor="middle">no image</text></g>
+          <g class="node" id="n-hbn"><rect x="306" y="548" width="206" height="34" rx="6"/><text x="409" y="563" text-anchor="middle">HBN</text><text class="st" id="s-hbn" x="409" y="576" text-anchor="middle">not running</text></g>
+          <!-- switch -->
+          <g class="node" id="n-sw"><rect x="286" y="622" width="246" height="30" rx="8"/><text x="409" y="641" text-anchor="middle" id="t-sw">switch · VXLAN</text></g>
+          <text class="small" x="170" y="542">pf0hpf</text>
+          <text class="small" x="418" y="612" id="t-vx">p0 / p1</text>
+          <text class="small" x="308" y="418">Redfish: image</text>
+          <text class="small" x="478" y="418">joins</text>
+        </svg>
+      </div>
+      <div class="here">
+        <div class="row"><span class="k">Focus</span><span class="v" id="herefocus"></span></div>
+        <div class="row"><span class="k">State</span><span class="v" id="herestate"></span></div>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--oob)"></i>control</span>
+        <span><i class="dot" style="background:var(--uplink)"></i>image over Redfish</span>
+        <span><i class="dot" style="background:var(--ok)"></i>DPU joins cluster</span>
+        <span><i class="dot" style="background:var(--hostlink)"></i>host link</span>
+        <span><i class="dot" style="background:var(--fabric)"></i>VXLAN to switch</span>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <span>Commands and file names are real. Terminal output is simulated. Values come from "Site values".</span>
+    <span id="footright"></span>
+  </footer>
+</div>
+
+<div class="bot">
+  <div class="quip" id="quip" role="status" aria-live="polite"></div>
+  <button class="furry" id="furry" aria-label="Guide: click for help" title="click me">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <g class="body">
+          <line x1="60" y1="30" x2="60" y2="14" stroke="var(--fur-dark)" stroke-width="3" stroke-linecap="round"/>
+          <circle class="led" cx="60" cy="11" r="5.5" fill="#ffffff" stroke="var(--fur-dark)" stroke-width="1.5"/>
+          <g fill="var(--fur)"><circle cx="96.0" cy="66.0" r="9"/><circle cx="93.3" cy="79.8" r="9"/><circle cx="85.5" cy="91.5" r="9"/><circle cx="73.8" cy="99.3" r="9"/><circle cx="60.0" cy="102.0" r="9"/><circle cx="46.2" cy="99.3" r="9"/><circle cx="34.5" cy="91.5" r="9"/><circle cx="26.7" cy="79.8" r="9"/><circle cx="24.0" cy="66.0" r="9"/><circle cx="26.7" cy="52.2" r="9"/><circle cx="34.5" cy="40.5" r="9"/><circle cx="46.2" cy="32.7" r="9"/><circle cx="60.0" cy="30.0" r="9"/><circle cx="73.8" cy="32.7" r="9"/><circle cx="85.5" cy="40.5" r="9"/><circle cx="93.3" cy="52.2" r="9"/></g>
+          <circle cx="60" cy="66" r="37" fill="var(--fur)"/>
+          <circle cx="30" cy="40" r="9" fill="var(--fur)"/><circle cx="90" cy="40" r="9" fill="var(--fur)"/>
+          <circle cx="30" cy="40" r="4" fill="#e7917c" opacity=".5"/><circle cx="90" cy="40" r="4" fill="#e7917c" opacity=".5"/>
+          <ellipse cx="60" cy="82" rx="20" ry="13" fill="var(--fur-light)"/>
+          <g class="eye"><ellipse cx="48" cy="60" rx="8" ry="9" fill="#fff"/><circle cx="50" cy="62" r="4.5" fill="#1a1a1a"/><circle cx="51.6" cy="60" r="1.6" fill="#fff"/></g>
+          <g class="eye"><ellipse cx="72" cy="60" rx="8" ry="9" fill="#fff"/><circle cx="74" cy="62" r="4.5" fill="#1a1a1a"/><circle cx="75.6" cy="60" r="1.6" fill="#fff"/></g>
+          <circle cx="39" cy="70" r="3.5" fill="#e7917c" opacity=".55"/><circle cx="81" cy="70" r="3.5" fill="#e7917c" opacity=".55"/>
+          <path d="M54 71 Q60 78 66 71" stroke="#3a2e25" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="48" cy="105" rx="9" ry="4.5" fill="var(--fur-dark)"/><ellipse cx="72" cy="105" rx="9" ry="4.5" fill="var(--fur-dark)"/>
+        </g>
+      </svg>
+    </button>
+</div>
+
+<section class="guide" id="guide" hidden aria-label="guide bot">
+  <header><b>Guide</b><span class="pill">scripted helper, not live AI</span><button class="ghost x" id="gclose" type="button" aria-label="close guide">✕</button></header>
+  <div class="chat" id="chat"></div>
+  <form class="ask" id="askform"><input id="askin" type="text" autocomplete="off" placeholder="Ask: which files, VIP, stuck, VXLAN, reboot…" aria-label="ask the guide"><button class="btn primary" type="submit">Ask</button></form>
+</section>
+
+<aside class="drawer" id="drawer" hidden aria-label="site values">
+  <header><b>Site values</b><span class="pill">saved in this browser only</span><button class="ghost x" id="dclose" type="button" aria-label="close site values">✕</button></header>
+  <div class="fields" id="fields"></div>
+  <footer><button class="btn" id="vreset" type="button">Example values</button><span>Every command and YAML line updates as you type. No passwords here.</span></footer>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ---------- site values: typed once, used in every command and YAML line ----------
+  var FIELDS = [
+    ['Cluster', null],
+    ['CTX', 'kubectl context of the management cluster', 'kubernetes-admin@cluster.local'],
+    ['API_IP', 'management Kubernetes API address (port 6443)', '192.0.2.20'],
+    ['Tenant cluster (tenant-a)', null],
+    ['VIP', 'free address for the tenant-a cluster API, reserved outside DHCP', '192.0.2.203'],
+    ['VIP_IF', 'network interface on the management nodes that carries the VIP', 'enp7s0'],
+    ['VRID', 'VRRP router id, unique on that network segment (1 to 255)', '127'],
+    ['Hardware', null],
+    ['BMC_IP', 'address of the DPU BMC', '192.0.2.149'],
+    ['SERIAL', 'DPU serial number, from the card label or the BMC', 'MT0000000000'],
+    ['OPN', 'DPU ordering part number, the model of the card', '900-9D3B4-00CV-EA0'],
+    ['DNS', 'DNS server the DPU uses', '192.0.2.53'],
+    ['HBN + VXLAN', null],
+    ['VRF', 'name of the tenant-a routing table', 'TENANT_A'],
+    ['L3VNI', 'VXLAN network identifier of that VRF', '100010'],
+    ['ASN', 'BGP autonomous system number of the DPU', '65010'],
+    ['HOST_NET', 'address block between server and DPU (/29)', '10.60.10.0/29'],
+    ['LOOPBACK', 'DPU loopback, the VXLAN tunnel source (/32)', '10.60.0.10/32'],
+    ['Switch (Cumulus)', null],
+    ['SW_PORTS', 'switch ports that face the DPU ports p0 and p1', 'swp21-22'],
+    ['SW_ASN', 'BGP autonomous system number of the switch', '65001'],
+    ['SW_LO', 'switch loopback: its router id and VXLAN source', '10.60.0.254'],
+    ['Argo CD path only', null],
+    ['REPO_URL', 'your Git repository that will hold the tenant-a folder', 'https://github.com/your-org/dpf-site.git']
+  ];
+  var DEF = {}; FIELDS.forEach(function (f) { if (f[1] !== null) DEF[f[0]] = f[2]; });
+  var V = Object.assign({}, DEF);
+  var FIXED = { NODE: 'dpu-node-tenant-a', DEV: 'tenant-a-dpu1', NS: 'dpf-operator-system' };
+  function hostAddr(n) { var m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)/.exec(V.HOST_NET); return m ? m[1] + '.' + m[2] + '.' + m[3] + '.' + (Number(m[4]) + n) : '10.60.10.' + n; }
+  function val(k) { if (k === 'PATCH') return PATCH; if (k === 'GEN') return fill(GEN); if (k === 'GW') return hostAddr(2); if (k === 'HOSTIP') return hostAddr(1); if (k === 'LO') return V.LOOPBACK.split('/')[0]; return k in V ? V[k] : (k in FIXED ? FIXED[k] : '{' + k + '}'); }
+  function fill(s) { return s.replace(/\{([A-Z][A-Z0-9_]*)\}/g, function (_, k) { return val(k); }); }
+
+  // ---------- the tenant-a YAML files (excerpts; {KEY} marks your value) and what each value means ----------
+  var FILES = {
+    opcfg: { path: 'tenant-a/10-operator/operatorconfig.yaml', y:
+'kind: DPFOperatorConfig\nmetadata:\n  name: dpfoperatorconfig\n  namespace: dpf-operator-system\nspec:\n  # ...\n  overrides:\n    kubernetesAPIServerPort: 6443\n    kubernetesAPIServerVIP: {API_IP}\n    argoCDNamespace: dpf-operator-system\n  provisioningController:\n    installInterface:\n      installViaRedfish:\n        skipDPUNodeDiscovery: false\n  # ...',
+      info: [['kubernetesAPIServerVIP', 'The address of the management cluster API that already exists. The DPU contacts it during the install. It is not the VIP of tenant-a.'], ['kubernetesAPIServerPort', 'The port of that API. 6443 is the usual one.'], ['installViaRedfish', 'DPF installs the DPU through its BMC over Redfish, the standard management API of the BMC. No software is needed on the server.']] },
+    cluster: { path: 'tenant-a/20-cluster/dpucluster.yaml', y:
+'kind: DPUCluster\nmetadata:\n  name: tenant-a\n  namespace: tenant-a\n  labels:\n    training.dpf.nvidia.com/tenant: tenant-a\nspec:\n  clusterEndpoint:\n    keepalived:\n      interface: {VIP_IF}\n      nodeSelector:\n        node-role.kubernetes.io/control-plane: \'\'\n      vip: {VIP}\n      virtualRouterID: {VRID}\n  kubeconfig: tenant-a-admin-kubeconfig\n  maxNodes: 1000\n  type: kamaji',
+      info: [['vip', 'A free address for the API of the tenant-a cluster. Reserve it outside the DHCP range. Nothing else may answer on it.'], ['interface', 'The network interface on the management nodes that carries the VIP. It must have the same name on every node.'], ['virtualRouterID', 'A number from 1 to 255 that the nodes use to agree on who holds the VIP. It must be unique on that network segment.'], ['tenant label', 'The label training.dpf.nvidia.com/tenant: tenant-a is how every other file finds this cluster. Keep it the same in all files.'], ['type: kamaji', 'The tenant cluster control plane runs as pods on the management cluster. Kamaji is the software that does this.']] },
+    device: { path: 'tenant-a/40-hardware/dpudevice.yaml', y:
+'kind: DPUDevice\nmetadata:\n  name: tenant-a-dpu1\n  namespace: dpf-operator-system\n  labels:\n    provisioning.dpu.nvidia.com/dpudevice-bmc-ip: {BMC_IP}\n    provisioning.dpu.nvidia.com/dpudevice-opn: {OPN}\n    provisioning.dpu.nvidia.com/dpudevice-psid: {SERIAL}\n    provisioning.dpu.nvidia.com/dpunode-name: dpu-node-tenant-a\nspec:\n  bmcIp: {BMC_IP}\n  bmcPort: 443\n  numberOfPFs: 1\n  opn: {OPN}\n  serialNumber: {SERIAL}',
+      info: [['serialNumber', 'The serial number of this one DPU card. It is printed on the card label and the BMC reports it. DPF uses it to be sure it installs the right card.'], ['opn', 'The ordering part number: the exact model of the card, for example 900-9D3B4-00CV-EA0 for one BlueField-3 model. DPF uses it to know which software fits.'], ['bmcIp, bmcPort', 'Where DPF reaches the BMC of this DPU. Port 443 is HTTPS.'], ['numberOfPFs', 'How many network ports of the card the server sees as its own. This example uses 1.'], ['label dpudevice-psid', 'A label with the serial number again. Labels are tags that other objects search for.'], ['label dpudevice-opn', 'A label with the part number again.'], ['label dpudevice-bmc-ip', 'A label with the BMC address again. The deployment in file 7 selects the device by this label, so both must be identical.'], ['label dpunode-name', 'The name of the DPUNode object that stands for the server holding this card.']] },
+    flavor: { path: 'tenant-a/40-hardware/dpuflavor.yaml', y:
+'kind: DPUFlavor\nmetadata:\n  name: hbn-tenant-a-v26.4.0\nspec:\n  # ... firmware, OVS and hugepage settings stay as they are\n  configFiles:\n  - path: /etc/netplan/60-tenant-a-dns.yaml\n    raw: |\n      network:\n        ethernets:\n          oob_net0:\n            nameservers:\n              addresses: [{DNS}]\n  dpuMode: zero-trust\n  # ...',
+      info: [['nameservers addresses', 'The DNS servers the DPU uses on its management port. The DPU needs working DNS and correct time to join the tenant cluster.'], ['dpuMode: zero-trust', 'The DPU runs in DPU mode and the server cannot manage it. All management comes through the BMC.'], ['bfb.yaml (next to this file)', 'Holds the web address of the BFB image file with the DPU operating system. It normally needs no change.']] },
+    hbn: { path: 'tenant-a/30-hbn/hbn-config.yaml', y:
+'kind: DPUServiceConfiguration\nmetadata:\n  name: doca-hbn-tenant-a\nspec:\n  deploymentServiceName: doca-hbn\n  serviceConfiguration:\n    helmChart:\n      values:\n        configuration:\n          perDPUValuesYAML: |\n            - hostnamePattern: dpu-node-tenant-a*\n              values:\n                bgp_peer_group: hbn\n                vrf1: {VRF}\n                l3vni1: {L3VNI}\n                bgp_autonomous_system: {ASN}\n          startupYAMLJ2: |      # the VXLAN part, no edit needed\n            nve:\n              vxlan:\n                enable: on\n                source:\n                  address: {{ ipaddresses.ip_lo.ip }}\n            vrf:\n              {{ config.vrf1 }}:\n                evpn:\n                  enable: on\n                  vni:\n                    {{ config.l3vni1 }}: {}',
+      info: [['vrf1', 'The name of the routing table HBN creates for tenant-a. A VRF keeps the routes of one tenant apart from every other tenant. The switch must have a VRF for the same tenant.'], ['l3vni1', 'The VXLAN network identifier of that VRF: the number written into every VXLAN packet of tenant-a. The switch must map the same number to its VRF.'], ['bgp_autonomous_system', 'The AS number HBN uses when it talks BGP to the switch. BGP is the protocol that exchanges routes. The switch has a different AS number and must accept this one.'], ['bgp_peer_group', 'A name for the BGP settings shared by both uplink ports p0 and p1. Leave it as hbn.'], ['hostnamePattern', 'Which DPUs get these values: every DPU whose node name starts with dpu-node-tenant-a.'], ['startupYAMLJ2', 'The HBN configuration template. It turns on EVPN and VXLAN and uses the three values above. No edit is needed.']] },
+    ipam: { path: 'tenant-a/30-hbn/ipam-host.yaml  and  tenant-a/30-hbn/ipam-loopback.yaml', y:
+'kind: DPUServiceIPAM\nmetadata:\n  name: tenant-a-host\nspec:\n  ipv4Network:\n    gatewayIndex: 2\n    network: {HOST_NET}\n    prefixSize: 29\n---\nkind: DPUServiceIPAM\nmetadata:\n  name: tenant-a-loopback\nspec:\n  ipv4Network:\n    network: {LOOPBACK}\n    prefixSize: 32',
+      info: [['tenant-a-host network', 'The small network between the server and the DPU. A /29 block holds 8 addresses.'], ['gatewayIndex: 2', 'HBN takes the second address of the block as the gateway: {GW}. The server uses the first: {HOSTIP}.'], ['tenant-a-loopback network', 'The address of the DPU itself: {LO}. It is the BGP router id and the source of the VXLAN tunnel. The switch must be able to reach it.'], ['prefixSize', 'The size of each block handed out. Change it together with the network.']] },
+    deploy: { path: 'tenant-a/40-hardware/dpudeployment.yaml', y:
+'kind: DPUDeployment\nmetadata:\n  name: hbn-tenant-a\nspec:\n  dpus:\n    bfb: bf-bundle-v26.4.0\n    flavor: hbn-tenant-a-v26.4.0\n    dpuSets:\n    - dpuClusterSelector:\n        training.dpf.nvidia.com/tenant: tenant-a\n      dpuDeviceSelector:\n        matchLabels:\n          provisioning.dpu.nvidia.com/dpudevice-bmc-ip: {BMC_IP}\n          provisioning.dpu.nvidia.com/dpunode-name: dpu-node-tenant-a\n      nameSuffix: tenant-a\n    nodeEffect:\n      hold: true          # DPF waits for you before it touches the DPU\n  services:\n    doca-hbn:\n      serviceConfiguration: doca-hbn-tenant-a\n      serviceTemplate: doca-hbn-tenant-a\n  serviceChains:          # p0, p1 and pf0hpf each connect to HBN\n    # ...',
+      info: [['dpuDeviceSelector', 'Finds the DPU by the labels from file 3. The BMC address here must be identical to the label there, or no DPU is selected.'], ['dpuClusterSelector', 'Sends the DPU to the cluster with the label tenant: tenant-a, from file 2.'], ['bfb, flavor', 'Which image and which settings to install: the two objects from file 4.'], ['hold: true', 'DPF prepares everything, then waits until a person releases the hold. Nothing is erased before that.'], ['services', 'Which service runs on the DPU: HBN, with the configuration from file 5.'], ['serviceChains', 'How the ports connect: p0 and p1 (to the switch) and pf0hpf (to the server) all pass through HBN.']] }
+  };
+
+  var GEN = String.raw`#!/usr/bin/env python3
+"""Create the tenant-a files from the example profile. Run in the DPF folder."""
+import pathlib, re, yaml
+v = dict(api='{API_IP}', vip='{VIP}', vip_if='{VIP_IF}', vrid={VRID}, bmc='{BMC_IP}',
+         serial='{SERIAL}', opn='{OPN}', dns='{DNS}', vrf='{VRF}', vni={L3VNI}, asn={ASN},
+         host_net='{HOST_NET}', loopback='{LOOPBACK}')
+src, out = pathlib.Path('profiles/two-tenant-hbn/desired'), pathlib.Path('tenant-a')
+files = {
+    '10-operator-config/dpfoperatorconfig-dpfoperatorconfig.yaml': '10-operator/operatorconfig.yaml',
+    '20-tenants/namespace-tenant-asia.yaml': '20-cluster/namespace.yaml',
+    '20-tenants/dpucluster-tenant-asia.yaml': '20-cluster/dpucluster.yaml',
+    '30-hbn/dpuservicetemplate-doca-hbn-asia.yaml': '30-hbn/hbn-template.yaml',
+    '30-hbn/dpuserviceconfiguration-doca-hbn-asia.yaml': '30-hbn/hbn-config.yaml',
+    '30-hbn/dpuserviceipam-asia-host.yaml': '30-hbn/ipam-host.yaml',
+    '30-hbn/dpuserviceipam-asia-loopback.yaml': '30-hbn/ipam-loopback.yaml',
+    '30-hbn/dpuserviceinterface-asia-p0.yaml': '30-hbn/if-p0.yaml',
+    '30-hbn/dpuserviceinterface-asia-p1.yaml': '30-hbn/if-p1.yaml',
+    '30-hbn/dpuserviceinterface-asia-pf0hpf.yaml': '30-hbn/if-pf0hpf.yaml',
+    '40-provisioning/bfb-bf-bundle-v26.4.0.yaml': '40-hardware/bfb.yaml',
+    '40-provisioning/dpuflavor-hbn-asia-example-v26.4.0.yaml': '40-hardware/dpuflavor.yaml',
+    '40-provisioning/dpudevice-example-asia.yaml': '40-hardware/dpudevice.yaml',
+    '40-provisioning/dpunode-dpu-node-example-asia.yaml': '40-hardware/dpunode.yaml',
+    '40-provisioning/dpudeployment-hbn-asia.yaml': '40-hardware/dpudeployment.yaml',
+}
+swaps = [  # example name or value -> tenant-a name or your value, in this order
+    (re.escape('dpu-node-example-asia'), 'dpu-node-tenant-a'), (re.escape('example-asia'), 'tenant-a-dpu1'),
+    ('EXAMPLEASIA', v['serial']), (re.escape('hbn-asia-example-v26.4.0'), 'hbn-tenant-a-v26.4.0'),
+    ('tenant-asia', 'tenant-a'), ('60-asia-lab-dns', '60-tenant-a-dns'), (r'\basia\b', 'tenant-a'),
+    ('vrf1: ASIA', 'vrf1: ' + v['vrf']), (re.escape('192.0.2.149'), v['bmc']), ('900-9D3B4-00CV-EA0', v['opn']),
+    ('l3vni1: 100002', 'l3vni1: %s' % v['vni']), ('bgp_autonomous_system: 65201', 'bgp_autonomous_system: %s' % v['asn']),
+    (r'addresses: \[192\.0\.2\.53, 198\.51\.100\.53, 203\.0\.113\.53\]', 'addresses: [%s]' % v['dns']),
+]
+def fix(x):
+    if isinstance(x, dict): return {fix(k): fix(i) for k, i in x.items()}
+    if isinstance(x, list): return [fix(i) for i in x]
+    if isinstance(x, str):
+        for a, b in swaps: x = re.sub(a, lambda m, b=b: b, x)
+    return x
+yaml.add_representer(str, lambda d, s: d.represent_scalar('tag:yaml.org,2002:str', s, style='|' if '\n' in s else None))
+for s, d in files.items():
+    doc = fix(yaml.safe_load((src / s).read_text()))
+    if doc['kind'] == 'DPFOperatorConfig': doc['spec']['overrides']['kubernetesAPIServerVIP'] = v['api']
+    if doc['kind'] == 'DPUCluster': doc['spec']['clusterEndpoint']['keepalived'].update(interface=v['vip_if'], vip=v['vip'], virtualRouterID=v['vrid'])
+    if doc['kind'] == 'DPUServiceIPAM': doc['spec']['ipv4Network']['network'] = v['host_net'] if 'host' in d else v['loopback']
+    path = out / d; path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(doc, sort_keys=False, width=200)); print('wrote', path)`;
+
+  var PATCH = `kubectl -n argocd patch application dpf-platform --type merge -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'`;
+
+  // small scenes for DPU 101
+  function sc(inner) { return '<svg class="scene" viewBox="0 0 560 150" role="img" aria-hidden="true">' + inner + '</svg>'; }
+  function bx(x, y, w, h, cls, a, b) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="8" class="' + cls + '"/><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + (b ? -3 : 4)) + '" text-anchor="middle">' + a + '</text>' + (b ? '<text class="small" x="' + (x + w / 2) + '" y="' + (y + h / 2 + 13) + '" text-anchor="middle">' + b + '</text>' : ''); }
+  var SCENE = {
+    card: sc('<rect class="zone" x="6" y="8" width="548" height="134" rx="12"/><text class="small" x="18" y="26">one server</text>' + bx(24, 44, 210, 80, 'sb', 'host', 'x86 CPUs · GPUs · your workloads') + bx(300, 36, 236, 96, 'sb hot', 'DPU (BlueField)', '') + bx(312, 84, 100, 38, 'sb', 'Arm CPU + OS', '') + bx(424, 84, 100, 38, 'sb', 'BMC', '') + '<line x1="234" y1="84" x2="300" y2="84" class="sl host"/>'),
+    why: sc(bx(24, 20, 244, 110, 'sb', 'Isolation', 'network control sits below the host') + bx(292, 20, 244, 110, 'sb', 'Offload', 'network work moves off the host CPU') + '<text class="small" x="146" y="112" text-anchor="middle">the host cannot change it</text><text class="small" x="414" y="112" text-anchor="middle">host cores stay free for workloads</text>'),
+    modes: sc('<text class="small" x="18" y="20">NIC mode</text>' + bx(18, 28, 120, 40, 'sb', 'host') + bx(200, 28, 160, 40, 'sb', 'card: plain NIC', '') + bx(422, 28, 120, 40, 'sb', 'network') + '<line x1="138" y1="48" x2="200" y2="48" class="sl host"/><line x1="360" y1="48" x2="422" y2="48" class="sl vx"/><text class="small" x="18" y="96">DPU mode (used here)</text>' + bx(18, 104, 120, 40, 'sb', 'host') + bx(200, 104, 160, 40, 'sb hot', 'card: HBN decides', '') + bx(422, 104, 120, 40, 'sb', 'network') + '<line x1="138" y1="124" x2="200" y2="124" class="sl host"/><line x1="360" y1="124" x2="422" y2="124" class="sl vx"/>'),
+    soft: sc(bx(18, 40, 150, 70, 'sb', 'image', 'BFB: the DPU OS') + bx(205, 40, 150, 70, 'sb', 'platform', 'DPF + Kubernetes') + bx(392, 40, 150, 70, 'sb hot', 'service', 'HBN: routing + VXLAN') + '<line x1="168" y1="75" x2="205" y2="75" class="sl ctl"/><line x1="355" y1="75" x2="392" y2="75" class="sl ctl"/>')
+  };
+
+  // ---------- the steps ----------
+  // cmd: commands shown and "typed" in the terminal. out: simulated output. set: what exists after the step.
+  var T1 = '  COMPONENT               STATUS     INSTALLED    NVIDIA PIN    READINESS   VERSION\n  ----------------------  ---------  -----------  ------------  ----------  --------\n';
+  var ACTS = [
+    { id: 'dpu101', title: 'DPU 101', sub: 'the basics', steps: [
+      { id: 'card', title: 'A computer on a card', run: 'Got it', scene: 'card', focus: ['n-host', 'n-dpu', 'n-bmc'],
+        text: '<p>A <b>DPU</b>, or data processing unit, is a network card with its own computer on it. It lives inside the same server as the host CPUs and the GPUs. BlueField is the DPU made by NVIDIA.</p><p>The card has its own <b>Arm processor</b>, its own memory and its own <b>operating system</b>. It also has its own <b>BMC</b>: a small management controller that stays reachable over the network, even when the card has no operating system yet.</p>',
+        hint: 'Three things to keep apart: the host operating system, the DPU operating system, and the DPU BMC. Each has its own address.', expect: 'Two computers in one server',
+        out: ['# one server = host + DPU. The DPU has its own CPU, its own OS and its own BMC.'], quip: ['New to DPUs? These four steps are the basics.', 'Two computers in one server. Next: why.'] },
+      { id: 'why', title: 'Why put a computer there', run: 'Got it', scene: 'why', focus: ['n-dpu', 'n-host'],
+        text: '<p>There are two reasons. The first is <b>isolation</b>: network control runs on the card, below the host. A tenant who owns the host cannot change it or switch it off.</p><p>The second is <b>offload</b>: routing, tunnels and filtering run on the card, so the host processors stay free for the workload.</p>',
+        hint: 'Isolation is the reason DPUs are used for multi-tenant clouds: the provider controls the network even when the tenant has root on the host.', expect: 'Isolation and offload',
+        out: ['# reason 1: isolation. reason 2: offload.'], quip: ['Two reasons, both about who controls the network.', 'Isolation and offload. Next: the two modes.'] },
+      { id: 'modes', title: 'NIC mode and DPU mode', run: 'Got it', scene: 'modes', focus: ['n-dpu', 'n-hbn', 'n-sw'],
+        text: '<p>The host reaches the network only through the card. What happens to a packet depends on the mode of the card.</p><ul><li><b>NIC mode</b>: the card behaves like a plain network card. Its Arm processor is not in the path.</li><li><b>DPU mode</b>: every packet passes through software on the card. That software decides where the packet goes.</li></ul><p>This install uses DPU mode in its strictest form, called <b>zero-trust</b>: the host cannot manage the card at all.</p>',
+        hint: 'In this install the software in the path is HBN. That is why the server only gets a network after HBN runs.', expect: 'DPU mode: the card decides',
+        out: ['# NIC mode: host -> wire. DPU mode: host -> software on the card -> wire.'], quip: ['The mode decides who owns the packet.', 'DPU mode, zero-trust. Next: the software.'] },
+      { id: 'soft', title: 'Software makes it infrastructure', run: 'Got it', scene: 'soft', focus: ['n-op', 'n-dpu', 'n-hbn'],
+        text: '<p>The hardware never changes. Three layers of software turn the card into infrastructure:</p><ul><li><b>Image</b>: a BFB file with the DPU operating system. It is written to the card through the BMC.</li><li><b>Platform</b>: DPF, the DOCA Platform Framework. It installs the image on every DPU the same way and joins the DPU to a Kubernetes cluster.</li><li><b>Service</b>: HBN, the NVIDIA routing service. It runs on the card and carries the traffic of the server in a VXLAN tunnel.</li></ul><p>One DPU can be set up by hand. A data center has hundreds, and that is what DPF is for.</p>',
+        hint: 'The rest of this workbench is those three layers in order: install the platform, describe the image and the service in YAML, then let DPF do the work.', expect: 'Image, platform, service',
+        out: ['# image (BFB) -> platform (DPF) -> service (HBN)'], quip: ['Three layers: image, platform, service.', 'That is DPU 101. Now the install.'] }
+    ] },
+    { id: 'goal', title: 'Goal', sub: 'what you build', steps: [
+      { id: 'what', title: 'DPU + HBN + VXLAN', run: 'Show the path', focus: ['n-admin', 'n-op', 'n-bmc', 'n-dpu', 'n-hbn', 'n-sw'],
+        text: '<p>This workbench takes one BlueField DPU from an empty card to a DPU that runs <b>HBN</b> and carries the traffic of the server in a <b>VXLAN</b> tunnel to the switch. It starts with <b>one tenant</b>, called <code>tenant-a</code>.</p><p>There are two ways to install the platform. Pick one:</p><ul><li><b>Installer path</b> (parts 2 and 3): the script <code>dpf-install.sh</code> checks the cluster and installs with Helm.</li><li><b>Argo CD path</b> (part 4): Argo CD installs everything from Git. The prerequisites are one click.</li></ul><p>After that both paths are the same: <b>seven YAML files</b> for tenant-a (part 5), the switch (part 6), and provisioning (part 7).</p>',
+        hint: 'Follow the steps on the left in order. Skip part 4 if you use the installer path, or skip parts 2 and 3 if you use Argo CD.', expect: 'The diagram shows the whole path.',
+        out: ['# admin terminal -> management cluster -> DPU BMC -> DPU -> HBN -> VXLAN -> switch', '# 8 parts. Nothing here touches a real cluster.'], quip: ['One tenant, tenant-a. One DPU. HBN and VXLAN.', 'That is the whole path. Next: your own values.'] },
+      { id: 'values', title: 'Enter your site values', run: 'Open site values', focus: ['n-admin'], act: 'values',
+        text: '<p>Open <b>Site values</b> and type the values of your site once. Every command and every YAML line in this workbench then shows <b>your</b> value, ready to copy.</p><p>The defaults are example values. They are safe to rehearse with.</p>',
+        tbl: ['CTX', 'API_IP', 'VIP', 'VIP_IF', 'BMC_IP', 'SERIAL', 'VRF', 'L3VNI', 'ASN', 'SW_PORTS'],
+        hint: 'You can come back and change a value at any time. Nothing is sent anywhere: the values stay in this browser.', expect: 'Values saved in this browser.',
+        out: ['# site values saved locally'], quip: ['Type your values once.', 'Good. Every command below now uses your values.'] }
+    ] },
+    { id: 'check', title: 'Check', sub: 'installer path', steps: [
+      { id: 'open', title: 'Open the installer', focus: ['n-admin'],
+        text: '<p>Go to the <code>DPF</code> folder of the repository on the administration machine and select the management cluster. The installer and the example YAML files are both there. Three control-plane nodes must be <b>Ready</b>.</p>',
+        cmd: ['cd dsx-os/DPF', "export CTX='{CTX}'", 'kubectl --context "$CTX" get nodes -o wide'],
+        out: ['NAME           STATUS   ROLES           AGE   VERSION   INTERNAL-IP', 'mgmt-node-01   Ready    control-plane   85d   v1.35.4   {API_IP}', 'mgmt-node-02   Ready    control-plane   85d   v1.35.4   192.0.2.21', 'mgmt-node-03   Ready    control-plane   85d   v1.35.4   192.0.2.22'],
+        hint: 'A wrong context is the most common first mistake. kubectl config get-contexts lists them.', expect: '<b>3 nodes Ready</b>',
+        wrong: [['A node is NotReady', 'Fix the cluster first. DPF needs a healthy management cluster.'], ['Unable to connect to the server', 'The context or the kubeconfig is wrong. Run kubectl config get-contexts.']],
+        quip: ['First make sure you talk to the right cluster.', 'Three nodes Ready. On to the checks.'] },
+      { id: 'sanity', title: 'Sanity: prerequisites', focus: ['n-pre', 'n-op'],
+        text: '<p>This check reads which components exist and at which version. It installs nothing. On a fresh cluster every DPF component is <b>Missing</b>, and that is the expected start.</p>',
+        cmd: ['./dpf-install.sh --sanity --prereq --context "$CTX"'],
+        out: ['=== NICo + DPF Installer ===', 'DPF Assistant | v26.4.0  /  Environment', 'Cluster: {CTX}', '', T1 + '  Kubernetes              Installed  v1.35.4      1.33–1.36     3/3 nodes   In range\n  cert-manager            Missing    -            v1.19.3       -           -\n  kamaji                  Missing    -            1.2.0         -           -\n  maintenance-operator    Missing    -            0.3.0         -           -\n  argo-cd                 Missing    -            9.4.1         -           -\n  node-feature-discovery  Missing    -            0.18.3        -           -\n  Storage (local-path)    Missing    -            Any existing  -           -\n  dpf-operator            Missing    -            v26.4.0       -           -', '', 'Status: REVIEW NEEDED (components missing)'],
+        hint: 'Missing is fine before the install. A component that is Installed at a different version is the case to stop and look at.', expect: 'Kubernetes <b>In range</b>, the rest <b>Missing</b>',
+        wrong: [['A component shows Installed with a version mismatch', 'Something from an earlier install is still there. Look at ./dpf-install.sh --clean (preview only) before you continue.'], ['Missing tool: helm', 'Install kubectl, helm and python3 with PyYAML on the administration machine.']],
+        quip: ['This one only reads. It cannot break anything.', 'Everything Missing: a clean start.'] },
+      { id: 'hw', title: 'Sanity: hardware and storage', focus: ['n-pre'],
+        text: '<p>Two more checks. <b>Hardware</b> reads the capacity of the control-plane nodes. <b>Storage</b> creates a small temporary volume, writes to it, reads it back and removes it.</p>',
+        cmd: ['./dpf-install.sh --sanity --hardware --context "$CTX"', './dpf-install.sh --sanity --storage --storage-class local-path --context "$CTX"'],
+        out: ['DPF Assistant | v26.4.0  /  Sanity / hardware', '', '  CONTROL-PLANE NODE  CPU  MEMORY    ARCH   PRESSURE  RESULT\n  ------------------  ---  --------  -----  --------  ------\n  mgmt-node-01        24   23.5 GiB  amd64  Clear     PASS\n  mgmt-node-02        24   23.5 GiB  amd64  Clear     PASS\n  mgmt-node-03        24   23.5 GiB  amd64  Clear     PASS', '', 'DPF v26.4.0 minimum per control-plane machine: 8 CPUs, 16 GB RAM, amd64/arm64.', 'Status: SUCCESS', '', 'DPF Assistant | v26.4.0  /  Sanity / storage', '  temporary 64Mi volume: bound, written, read back, removed', 'Status: SUCCESS'],
+        hint: 'The storage check is the only sanity check here that creates something, and it removes it again.', expect: '<b>PASS</b> on every node, storage <b>SUCCESS</b>',
+        wrong: [['RESULT is FAIL for a node', 'DPF v26.4.0 needs 8 CPUs and 16 GB RAM per control-plane machine.'], ['The storage volume stays Pending', 'The cluster has no working storage class. The prerequisite install adds local-path when none exists.']],
+        quip: ['8 CPUs and 16 GB per control-plane machine is the minimum.', 'Capacity and storage are fine.'] },
+      { id: 'nics', title: 'Sanity: find the interface', focus: ['n-pre', 'n-cluster'],
+        text: '<p>The tenant-a cluster will need a <b>VIP</b>, a virtual IP address, carried by one network interface on the management nodes. This check lists the real interfaces of every node, so you can confirm the name you entered as <code>VIP_IF</code>.</p>',
+        cmd: ['./dpf-install.sh --sanity --nics --context "$CTX"'],
+        out: ['DPF Assistant | v26.4.0  /  Sanity / nics', '', '  NODE          INTERFACE  STATE  ADDRESS', '  mgmt-node-01  {VIP_IF}     UP     192.0.2.101/24', '  mgmt-node-02  {VIP_IF}     UP     192.0.2.102/24', '  mgmt-node-03  {VIP_IF}     UP     192.0.2.103/24', '', 'Status: SUCCESS'],
+        hint: 'The interface must exist with the same name on all three nodes, and the VIP must belong to its network.', expect: '<b>{VIP_IF}</b> is UP on all three nodes',
+        wrong: [['The interface name differs between nodes', 'Pick the interface that is on the DPU management network on every node, or rename them to match.']],
+        quip: ['The VIP needs one interface name that exists on every node.', 'Interface confirmed. Checks are done.'] }
+    ] },
+    { id: 'install', title: 'Install', sub: 'installer path', steps: [
+      { id: 'predry', title: 'Preview the prerequisites', focus: ['n-pre'],
+        text: '<p>A dry run shows what the prerequisite install would do. It downloads nothing and changes nothing.</p>',
+        cmd: ['./dpf-install.sh --install-prereq --dry-run --context "$CTX"'],
+        out: ['DRY RUN: no downloads, no cluster changes', '', '  would install  cert-manager             v1.19.3', '  would install  argo-cd                  9.4.1', '  would install  node-feature-discovery   0.18.3', '  would install  maintenance-operator     0.3.0', '  would install  kamaji                   1.2.0', '  would install  local-path-provisioner   0.0.34   (no storage class found)', '', 'Result: SUCCEEDED (exit code: 0)'],
+        hint: 'local-path is installed only when the cluster has no storage. An existing provisioner is kept.', expect: 'Six components listed, <b>no changes made</b>',
+        quip: ['Always preview first.', 'Six components, all at fixed versions.'] },
+      { id: 'pre', title: 'Install the prerequisites', focus: ['n-pre'], set: { pre: 1 },
+        text: '<p>This installs the helper software DPF needs, from the chart set NVIDIA publishes for DPF v26.4.0. It takes a few minutes. A failure stops the run and nothing is uninstalled automatically.</p>',
+        cmd: ['./dpf-install.sh --install-prereq --context "$CTX"'],
+        out: ['Installing prerequisites from NVIDIA/doca-platform v26.4.0 deploy/helmfiles', '', '  cert-manager             v1.19.3   Ready', '  argo-cd                  9.4.1     Ready', '  node-feature-discovery   0.18.3    Ready', '  maintenance-operator     0.3.0     Ready', '  kamaji                   1.2.0     Ready', '  local-path-provisioner   0.0.34    Ready', '', 'Logs: installer/logs/latest.log', 'Result: SUCCEEDED (exit code: 0)'],
+        hint: 'If it stops, read installer/logs/latest.log, fix the cause and run the same command again. It reconciles.', expect: 'Every row <b>Ready</b>',
+        wrong: [['A chart times out', 'Run ./dpf-install.sh --diagnose --more to see the pod and event that blocks it. Image pulls and storage are the usual causes.'], ['Missing tool: helmfile', 'The install also needs helmfile and jq on the administration machine.']],
+        quip: ['This is the first step that changes the cluster.', 'Prerequisites are in. Look at the diagram.'] },
+      { id: 'op', title: 'Install the DPF operator', focus: ['n-op'], set: { op: 1 },
+        text: '<p>Now the DPF operator itself, at v26.4.0. This installs the operator only. It does not touch a DPU.</p>',
+        cmd: ['./dpf-install.sh --install-dpf --dry-run --context "$CTX"', './dpf-install.sh --install-dpf --context "$CTX"', 'kubectl --context "$CTX" -n dpf-operator-system get deployment dpf-operator-controller-manager'],
+        out: ['DRY RUN: would install dpf-operator v26.4.0', '', 'Installing dpf-operator v26.4.0', 'Result: SUCCEEDED (exit code: 0)', '', 'NAME                              READY   UP-TO-DATE   AVAILABLE   AGE', 'dpf-operator-controller-manager   1/1     1            1           42s'],
+        hint: 'The operator waits for its configuration. The controllers that do the work start in part 7.', expect: 'Deployment <b>1/1 Available</b>',
+        wrong: [['The install is refused because runtime configuration exists', 'Objects from an earlier install are still present. Preview a reset with ./dpf-install.sh --clean.']],
+        quip: ['The operator alone does nothing to hardware.', 'Operator is running.'] },
+      { id: 'verify', title: 'Verify the platform', focus: ['n-pre', 'n-op'],
+        text: '<p>Read the table again. Every row must now be installed, ready and at the expected version.</p>',
+        cmd: ['./dpf-install.sh --verify --context "$CTX"'],
+        out: ['DPF Assistant | v26.4.0  /  Environment', '', T1 + '  Kubernetes              Installed  v1.35.4      1.33–1.36     3/3 nodes   In range\n  cert-manager            Installed  v1.19.3      v1.19.3       Ready       Match\n  kamaji                  Installed  1.2.0        1.2.0         Ready       Match\n  maintenance-operator    Installed  0.3.0        0.3.0         Ready       Match\n  argo-cd                 Installed  9.4.1        9.4.1         Ready       Match\n  node-feature-discovery  Installed  0.18.3       0.18.3        Ready       Match\n  Storage (local-path)    Installed  v0.0.34      Any existing  Ready       Accepted\n  dpf-operator            Installed  v26.4.0      v26.4.0       Ready       Match', '', 'Status: SUCCESS'],
+        hint: 'The exit code is 0 only when every check passes, so this command also works in a script.', expect: 'Every row <b>Match</b> or <b>Accepted</b>',
+        quip: ['Same table as before, now it should be green.', 'The platform is complete. Now your site.'] }
+    ] },
+    { id: 'argo', title: 'Argo CD', sub: 'the other path', steps: [
+      { id: 'covers', title: 'Does Argo CD cover the prerequisites?', focus: ['n-admin', 'n-pre', 'n-op'],
+        banner: ['YES · ONE CLICK', 'One Argo CD Application, <b>dpf-platform</b>, installs all prerequisites and the DPF operator: storage, cert-manager, Kamaji, Node Feature Discovery, Maintenance Operator, the DPF operator and the Argo CD that DPF uses for its services. In the Argo CD screen that is one click on <b>SYNC</b>.'],
+        text: '<p>Argo CD is a tool that reads YAML files from Git and creates the same objects in the cluster. With it, this part replaces parts 2 and 3. The sanity checks of part 2 are still worth running first: they only read.</p><p>Argo CD itself is installed once with Helm. This is the only install command of this path.</p>',
+        cmd: ['cd dsx-os/DPF', 'helm repo add argo https://argoproj.github.io/argo-helm', 'helm repo update argo', 'helm install external-argo-cd argo/argo-cd --version 9.4.1 --namespace argocd --create-namespace --set configs.cm.installationID=dsx-platform -f values/external-argo.yaml --wait --timeout 10m', 'kubectl -n argocd get pods'],
+        out: ['"argo" has been added to your repositories', 'NAME: external-argo-cd', 'STATUS: deployed', '', 'NAME                                                READY   STATUS    AGE', 'external-argo-cd-argocd-application-controller-0   1/1     Running   50s', 'external-argo-cd-argocd-repo-server-6c9d7f5c8-x2xkq 1/1     Running   50s', 'external-argo-cd-argocd-server-7b5f6d9c74-m8w2j    1/1     Running   50s', 'external-argo-cd-argocd-redis-5f8b6c7d9-qv7lp      1/1     Running   50s'],
+        hint: 'Use one path per cluster. The installer path and the Argo CD path install the same components, and Argo CD refuses to take over objects it does not own.', expect: 'Argo CD pods <b>Running</b>',
+        wrong: [['helm install says the release already exists', 'Argo CD is already installed. Skip this step.'], ['Pods stay Pending', 'The cluster has no room or no storage for them. kubectl -n argocd describe pod shows the reason.']],
+        quip: ['Short answer: yes. Argo CD covers the prerequisites.', 'Argo CD is running. Now the one click.'] },
+      { id: 'platform', title: 'One click: the whole platform', focus: ['n-pre', 'n-op'], set: { pre: 1, op: 1 },
+        banner: ['ONE CLICK', 'Apply one file, then press <b>SYNC</b> on <b>dpf-platform</b> in the Argo CD screen. From a terminal the same click is the second command below.'],
+        text: '<p>The file <code>00-platform.yaml</code> is one Argo CD Application. It points at a single generated file in the repository that holds all seven components at fixed versions: 201 objects.</p><p>Wait until it shows <b>Synced</b>, <b>Healthy</b> and <b>Succeeded</b>. Then the platform is complete, exactly as after parts 2 and 3.</p>',
+        cmd: ['kubectl apply -f generated/applications/00-platform.yaml', '{PATCH}', 'kubectl -n argocd get application dpf-platform -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w'],
+        out: ['application.argoproj.io/dpf-platform created', 'application.argoproj.io/dpf-platform patched', '', 'NAME           SYNC        HEALTH        OPERATION', 'dpf-platform   OutOfSync   Missing       Running', 'dpf-platform   Synced      Progressing   Running', 'dpf-platform   Synced      Healthy       Succeeded'],
+        hint: 'Start the sync once and let it finish. It retries up to five times on its own. Ctrl+C only stops the watching.', expect: '<b>Synced · Healthy · Succeeded</b>',
+        wrong: [['OPERATION shows Failed', 'Read the message: kubectl -n argocd get application dpf-platform -o jsonpath={.status.operationState.message}. A component left from an earlier install is the usual cause.'], ['It stays Progressing for a long time', 'An image cannot be pulled or a volume cannot be created. Look at the pods in dpf-operator-system and cert-manager.']],
+        quip: ['This is the one click.', 'Prerequisites and operator are installed. One Application did it.'] },
+      { id: 'git', title: 'Put tenant-a in your Git', focus: ['n-admin'],
+        text: '<p>Argo CD reads from Git, so the tenant-a files must be in a Git repository that Argo CD can read. Do <b>part 5</b> first: it creates the folder <code>tenant-a/</code> with your values. Then push that folder to your own repository.</p><p>Keep passwords out of it. The BMC password is not in these files.</p>',
+        cmd: ['git clone {REPO_URL} ~/dpf-site', 'cp -r tenant-a ~/dpf-site/', 'cd ~/dpf-site && git add tenant-a && git commit -m "Add tenant-a" && git push', 'cd -'],
+        out: ["Cloning into '/root/dpf-site'...", '[main 4f2c9d1] Add tenant-a', ' 15 files changed, 412 insertions(+)', 'To {REPO_URL}', '   8a1e6b2..4f2c9d1  main -> main'],
+        hint: 'A private repository works too. Argo CD then needs read access to it, set up once in Argo CD.', expect: '15 files pushed',
+        wrong: [['Argo CD later says it cannot read the repository', 'Give Argo CD read access: a deploy key or a token, added under Settings, Repositories in Argo CD.']],
+        quip: ['Argo CD only sees what is in Git.', 'tenant-a is in Git.'] },
+      { id: 'apps', title: 'Four Applications roll it out', focus: ['n-op', 'n-cluster', 'n-hbndef', 'n-hw'],
+        text: '<p>One Application per folder: <code>10-operator</code>, <code>20-cluster</code>, <code>30-hbn</code> and <code>40-hardware</code>. Create all four with the block below. Then sync them <b>one at a time, in this order</b>, and check the result before the next one. Part 7 shows what to expect after each.</p><p>Sync <b>40-hardware last</b>. It is the one that can reinstall the DPU. The BMC password still goes in by the helper from part 5.</p><p>This uses the same mechanism as the Applications in the repository. For tenant-a it has not been run on a cluster yet.</p>',
+        codes: [['Create the four Applications', 'for s in 10-operator 20-cluster 30-hbn 40-hardware; do\ncat <<EOF | kubectl apply -f -\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata: {name: tenant-a-$s, namespace: argocd}\nspec:\n  project: default\n  source:\n    repoURL: {REPO_URL}\n    targetRevision: main\n    path: tenant-a/$s\n    directory: {recurse: false, include: \'*.yaml\'}\n  destination: {name: in-cluster, namespace: dpf-operator-system}\n  syncPolicy:\n    syncOptions: [ServerSideApply=true, FailOnSharedResource=true]\nEOF\ndone']],
+        cmd: ['kubectl -n argocd get applications', '# sync in order: press SYNC on tenant-a-10-operator, then 20-cluster, then 30-hbn, then 40-hardware'],
+        out: ['NAME                   SYNC STATUS   HEALTH STATUS', 'dpf-platform           Synced        Healthy', 'tenant-a-10-operator   OutOfSync     Missing', 'tenant-a-20-cluster    OutOfSync     Missing', 'tenant-a-30-hbn        OutOfSync     Missing', 'tenant-a-40-hardware   OutOfSync     Missing'],
+        hint: 'To change a value later, edit the file in Git and sync again. Git then also holds the history of every change.', expect: 'Four Applications, ready to sync',
+        wrong: [['A sync fails with a shared resource message', 'The object already exists and belongs to something else, for example because it was applied by hand. Remove the hand-applied copy or keep to one path.']],
+        quip: ['Four folders, four Applications, synced in order.', 'Ready. Parts 5 to 7 are the same for both paths.'] }
+    ] },
+    { id: 'edit', title: 'Edit', sub: 'the tenant-a files', steps: [
+      { id: 'gen', title: 'Create the tenant-a files', focus: ['n-admin'],
+        text: '<p>The repository ships an example for two tenants. This small script copies the files of one of them, renames it to <b>tenant-a</b> and writes in <b>your site values</b>. The result is the folder <code>tenant-a/</code> with 15 files in four subfolders.</p><p>The script is in the repository as <code>DPF/make-tenant-a.py</code>, with example values at its top. The copy below is the same script with <b>your</b> values already written in: paste it over the file, or edit the values at the top by hand. Then run it. Seven of the 15 files carry your values. The next steps show each one.</p>',
+        codes: [['make-tenant-a.py (already filled with your site values)', '{GEN}']],
+        cmd: ['python3 make-tenant-a.py', 'find tenant-a -type f | sort'],
+        out: ['wrote tenant-a/10-operator/operatorconfig.yaml', 'wrote tenant-a/20-cluster/namespace.yaml', 'wrote tenant-a/20-cluster/dpucluster.yaml', 'wrote tenant-a/30-hbn/hbn-template.yaml', 'wrote tenant-a/30-hbn/hbn-config.yaml', 'wrote tenant-a/30-hbn/ipam-host.yaml', 'wrote tenant-a/30-hbn/ipam-loopback.yaml', 'wrote tenant-a/30-hbn/if-p0.yaml', 'wrote tenant-a/30-hbn/if-p1.yaml', 'wrote tenant-a/30-hbn/if-pf0hpf.yaml', 'wrote tenant-a/40-hardware/bfb.yaml', 'wrote tenant-a/40-hardware/dpuflavor.yaml', 'wrote tenant-a/40-hardware/dpudevice.yaml', 'wrote tenant-a/40-hardware/dpunode.yaml', 'wrote tenant-a/40-hardware/dpudeployment.yaml'],
+        hint: 'Change a value in Site values and copy the script again: it always carries your current values. Running it again overwrites the folder.', expect: '<b>15 files</b> in tenant-a/',
+        wrong: [['ModuleNotFoundError: yaml', 'Install PyYAML: python3 -m pip install pyyaml.'], ['FileNotFoundError: profiles/two-tenant-hbn', 'Run the script inside the DPF folder of the repository.']],
+        quip: ['One script writes all the tenant-a files with your values.', '15 files. Seven of them carry your values.'] },
+      { id: 'bmc', title: 'BMC access and password', focus: ['n-secret', 'n-bmc'], set: { secret: 1 },
+        text: '<p>DPF installs the DPU through its <b>BMC</b>. First test that the cluster reaches the BMC, then store the BMC password as a Kubernetes Secret. The password is typed at a prompt and is never written to a file.</p>',
+        cmd: ['./dpf-install.sh --check-bmc --context "$CTX"', 'python3 installer/lab/create-bmc-secret.py --context "$CTX"'],
+        out: ['Node: mgmt-node-01   NIC: {VIP_IF}   BMC: {BMC_IP}', 'PASS  Redfish read access from mgmt-node-01 to {BMC_IP}', '', 'BMC root password: ********', 'secret/bmc-shared-password created'],
+        hint: 'All DPU BMCs in this example share one root password. The check proves read access from one node, not every permission.', expect: '<b>PASS</b>, then Secret <b>bmc-shared-password</b>',
+        wrong: [['unreachable or timed out', 'The management nodes have no route to the BMC network. Fix routing or pick the node and interface that are on that network.'], ['authentication denied', 'Wrong BMC user or password. Test it with curl --user root https://{BMC_IP}/redfish/v1/Systems.']],
+        quip: ['No YAML here: the password never goes into a file.', 'DPF can now log in to the BMC.'] },
+      { id: 'f1', title: 'File 1: operator settings', file: 'opcfg', focus: ['n-op'], tag: 1,
+        text: '<p>The first file tells DPF where the management cluster API is. It carries <b>one</b> of your values.</p>',
+        hint: 'This is the API address of the cluster that already exists. It is not the VIP of tenant-a.', expect: 'One value',
+        quip: ['One value: the API address of your management cluster.', 'File 1 is ready.'] },
+      { id: 'f2', title: 'File 2: the tenant-a cluster', file: 'cluster', focus: ['n-cluster'], tag: 1,
+        text: '<p>DPF creates a second Kubernetes cluster that manages the DPUs of <b>tenant-a</b>. It needs a free address for its API (the VIP), the interface that carries it, and a router id that nothing else on that network uses.</p>',
+        hint: 'The VIP must be reserved outside the DHCP range, and nothing else may answer on it. ping and arp are a quick test.', expect: 'Three values',
+        wrong: [['Later the DPUCluster never becomes Ready', 'The VIP is in use, outside the interface network, or another device uses the same VRRP router id.']],
+        quip: ['Three values: VIP, interface, router id.', 'File 2 is ready.'] },
+      { id: 'f3', title: 'File 3: the DPU itself', file: 'device', focus: ['n-hw', 'n-bmc'], tag: 1,
+        text: '<p>One <b>DPUDevice</b> object describes one physical DPU. Three facts come from your hardware records: BMC address, serial number and part number. Each appears twice, once as a field and once as a label.</p>',
+        hint: 'To read serial and part number from a card you already reach: curl --insecure --user root https://{BMC_IP}/redfish/v1/Systems shows the system, and its page lists SerialNumber and the model.', expect: 'Three values, six lines',
+        wrong: [['Later no DPU object appears', 'A label here does not match the selector in file 7. The BMC address must be identical in both files.']],
+        quip: ['Serial number and part number: both are on the card label.', 'File 3 is ready.'] },
+      { id: 'f4', title: 'File 4: image and settings', file: 'flavor', focus: ['n-hw', 'n-dpu'], tag: 1,
+        text: '<p>The <b>DPUFlavor</b> holds settings applied during the install. The one value of yours is the DNS server the DPU uses. The image itself is named in <code>bfb.yaml</code> next to it and usually stays as it is.</p>',
+        hint: 'A DPU without working DNS and correct time cannot finish joining the tenant cluster.', expect: 'DNS address set',
+        quip: ['The image address usually stays. The DNS server is yours.', 'File 4 is ready.'] },
+      { id: 'f5', title: 'File 5: HBN and VXLAN', file: 'hbn', focus: ['n-hbndef', 'n-hbn', 'n-sw'], tag: 1,
+        text: '<p>This is the network file. Three values come from your network team: the <b>VRF</b> name, the <b>L3 VNI</b> and the <b>ASN</b>. The VXLAN settings themselves are already in the file.</p>',
+        hint: 'The switch must carry the same VRF and VNI, and must be set to exchange routes with this ASN. Part 6 shows the switch side.', expect: 'Three values',
+        wrong: [['Later BGP stays down', 'The switch does not expect this ASN, or the links p0 and p1 are not up.'], ['Later routes are missing', 'The VNI or the route targets differ between the DPU and the switch.']],
+        quip: ['The VXLAN file. Three numbers from the network team.', 'File 5 is ready. This is the heart of the goal.'] },
+      { id: 'f6', title: 'File 6: addresses', file: 'ipam', focus: ['n-hbndef', 'n-host'], tag: 1,
+        text: '<p>Two address pools. The <b>host block</b> is the small network between the server and the DPU. The <b>loopback</b> is the address of the DPU itself and the source of its VXLAN tunnel.</p>',
+        tbl2: [['server address', '{HOSTIP}'], ['gateway (HBN)', '{GW}'], ['VXLAN source', '{LO}']],
+        hint: 'The server gets the first address of the block by its own network setup. That part is done on the server, not here.', expect: 'Two networks',
+        quip: ['Two pools: the link to the server and the loopback.', 'File 6 is ready.'] },
+      { id: 'f7', title: 'File 7: the deployment', file: 'deploy', focus: ['n-hw', 'n-hbndef'], tag: 1,
+        text: '<p>The <b>DPUDeployment</b> ties everything together: which DPU, which image, which settings, which cluster and which service. Its selector must match the BMC address label from file 3.</p><p>Note <code>hold: true</code>. With it, DPF waits for your go-ahead before it touches the DPU.</p>',
+        hint: 'The other eight files carry no site values: namespace, service template, three interface files, the image, and the node.', expect: 'Selector matches file 3',
+        quip: ['Last file. The selector must match the label from file 3.', 'All seven files are ready.'] }
+    ] },
+    { id: 'switch', title: 'Switch', sub: 'Cumulus: BGP + EVPN', steps: [
+      { id: 'ports', title: 'Ports and BGP to the DPU', focus: ['n-sw', 'n-hbn'],
+        text: '<p>The switch needs the other half of file 5. These are Cumulus Linux commands (NVUE), taken from the configuration that worked in the lab and filled with your values.</p><p>The two ports that face the DPU become routed ports. The switch then talks <b>BGP</b> to the DPU on both, without addresses on the links (unnumbered). It expects the DPU to use AS <b>{ASN}</b>. The switch keeps its own AS <b>{SW_ASN}</b>.</p><p>The last four lines limit what is exchanged on the underlay: the switch announces only its loopback and accepts only the DPU loopback.</p>',
+        codes: [['On the switch', 'nv unset interface {SW_PORTS} bridge\nnv set interface {SW_PORTS} link mtu 9216\nnv set vrf default router bgp address-family l2vpn-evpn state enabled\nnv set vrf default router bgp peer-group hbn-tenant-a remote-as {ASN}\nnv set vrf default router bgp peer-group hbn-tenant-a address-family ipv4-unicast state enabled\nnv set vrf default router bgp peer-group hbn-tenant-a address-family l2vpn-evpn state enabled\nnv set vrf default router bgp neighbor {SW_PORTS} type unnumbered\nnv set vrf default router bgp neighbor {SW_PORTS} peer-group hbn-tenant-a\nnv set router policy prefix-list HBN-UNDERLAY-OUT type ipv4\nnv set router policy prefix-list HBN-UNDERLAY-OUT rule 10 action permit\nnv set router policy prefix-list HBN-UNDERLAY-OUT rule 10 match {SW_LO}/32\nnv set router policy prefix-list HBN-TENANT-A-IN type ipv4\nnv set router policy prefix-list HBN-TENANT-A-IN rule 10 action permit\nnv set router policy prefix-list HBN-TENANT-A-IN rule 10 match {LOOPBACK}\nnv set vrf default router bgp peer-group hbn-tenant-a address-family ipv4-unicast policy outbound prefix-list HBN-UNDERLAY-OUT\nnv set vrf default router bgp peer-group hbn-tenant-a address-family ipv4-unicast policy inbound prefix-list HBN-TENANT-A-IN']],
+        cmd: ['# on the switch: check that nothing else is pending before you start', 'nv config diff'],
+        out: ['# (no output: no pending changes)'],
+        hint: 'remote-as {ASN} must equal bgp_autonomous_system in file 5. A mismatch keeps the BGP session down.', expect: 'Commands staged, nothing applied yet',
+        wrong: [['nv config diff shows changes you did not make', 'Someone else has pending changes on the switch. Do not apply until you know what they are.']],
+        quip: ['The switch needs the same numbers as file 5.', 'BGP toward the DPU is staged.'] },
+      { id: 'vx', title: 'VXLAN and the tenant-a VRF', focus: ['n-sw', 'n-hbndef'],
+        text: '<p>Now the tenant side. The switch turns on EVPN and VXLAN with its loopback <b>{SW_LO}</b> as the tunnel source. It creates the VRF <b>{VRF}</b> and maps VNI <b>{L3VNI}</b> to it: the same two values as in file 5.</p><p>The <b>route target</b> <code>{ASN}:{L3VNI}</code> is the tag that tells both sides which routes belong to tenant-a. The switch imports and exports with the tag the DPU uses.</p>',
+        codes: [['On the switch', 'nv set evpn state enabled\nnv set nve vxlan state enabled\nnv set nve vxlan source address {SW_LO}\nnv set vrf {VRF} evpn state enabled\nnv set vrf {VRF} evpn vni {L3VNI}\nnv set vrf {VRF} router bgp state enabled\nnv set vrf {VRF} router bgp autonomous-system {SW_ASN}\nnv set vrf {VRF} router bgp router-id {SW_LO}\nnv set vrf {VRF} router bgp address-family ipv4-unicast state enabled\nnv set vrf {VRF} router bgp address-family ipv4-unicast route-export to-evpn state enabled\nnv set vrf {VRF} router bgp route-import from-evpn route-target {ASN}:{L3VNI}\nnv set vrf {VRF} router bgp route-export to-evpn route-target {ASN}:{L3VNI}'], ['Optional: give tenant-a a default route to the outside', 'nv set vrf {VRF} router static 0.0.0.0/0 via YOUR-UPLINK-NEXT-HOP\nnv set router policy prefix-list HBN-DEFAULT type ipv4\nnv set router policy prefix-list HBN-DEFAULT rule 10 action permit\nnv set router policy prefix-list HBN-DEFAULT rule 10 match 0.0.0.0/0\nnv set router policy route-map HBN-DEFAULT rule 10 action permit\nnv set router policy route-map HBN-DEFAULT rule 10 match ip-prefix-list HBN-DEFAULT\nnv set vrf {VRF} router bgp address-family ipv4-unicast redistribute static state enabled\nnv set vrf {VRF} router bgp address-family ipv4-unicast redistribute static route-map HBN-DEFAULT\nnv set vrf {VRF} router bgp address-family ipv4-unicast route-export to-evpn route-map HBN-DEFAULT']],
+        cmd: ['nv config diff'],
+        out: ['# the staged lines for bgp, evpn, nve and vrf {VRF} are listed'],
+        hint: 'How tenant-a reaches the outside (the uplink interface, its address and the next hop) is specific to your site. The optional block shows the pattern the lab used.', expect: 'VRF {VRF} with VNI {L3VNI} staged',
+        quip: ['Same VRF, same VNI, matching route target.', 'The tenant side is staged.'] },
+      { id: 'swapply', title: 'Apply and check the switch', focus: ['n-sw'], set: { sw: 1 },
+        text: '<p>Review the diff once more, apply it and save it. Then look at the BGP sessions. Until the DPU runs HBN (part 7), both sessions show <b>Idle</b>. That is expected at this point.</p>',
+        cmd: ['nv config diff', 'nv config apply', 'nv config save', 'vtysh -c "show bgp l2vpn evpn summary"'],
+        out: ['applied [rev_id: 12]', 'saved', '', 'Neighbor   V    AS     MsgRcvd  MsgSent  Up/Down  State/PfxRcd', 'swp21      4    0      0        0        never    Idle', 'swp22      4    0      0        0        never    Idle'],
+        hint: 'Come back to this command after part 7. Both rows should then show a number in the last column.', expect: 'Config applied, sessions <b>Idle</b> for now',
+        wrong: [['nv config apply reports an error', 'Read the line it names. An interface that is still part of a bridge or a bond is the usual cause.']],
+        quip: ['Idle is fine until the DPU is up.', 'The switch is ready for tenant-a.'] }
+    ] },
+    { id: 'prov', title: 'Provision', sub: 'apply, release, verify', steps: [
+      { id: 'acfg', title: 'Apply settings and the cluster', focus: ['n-op', 'n-cluster'], set: { cluster: 1 },
+        text: '<p>Apply the first two folders. DPF starts its controllers and creates the tenant-a cluster at the VIP. No DPU has joined yet.</p><p><b>Argo CD path:</b> press SYNC on <code>tenant-a-10-operator</code>, then on <code>tenant-a-20-cluster</code>. The check is the same.</p>',
+        cmd: ['kubectl apply -f tenant-a/10-operator/', 'kubectl apply -f tenant-a/20-cluster/', 'kubectl -n tenant-a wait dpucluster/tenant-a --for=condition=Ready --timeout=600s'],
+        out: ['dpfoperatorconfig.operator.dpu.nvidia.com/dpfoperatorconfig created', 'namespace/tenant-a created', 'dpucluster.provisioning.dpu.nvidia.com/tenant-a created', 'dpucluster.provisioning.dpu.nvidia.com/tenant-a condition met'],
+        hint: 'If the namespace file is applied after the cluster file, run the command again. The folder order takes care of it here.', expect: 'DPUCluster <b>condition met</b>',
+        wrong: [['The wait times out', 'Check the VIP: kubectl -n tenant-a get pods shows the keepalived pods. A VIP in use or a wrong interface keeps the cluster from becoming Ready.']],
+        quip: ['Folders 10 and 20 go in first.', 'The tenant-a cluster answers at its VIP.'] },
+      { id: 'ahbn', title: 'Apply HBN and VXLAN objects', focus: ['n-hbndef'], set: { hbndef: 1 },
+        text: '<p>Apply the HBN folder: the service template, files 5 and 6, and the three interface files. This only prepares the definitions. HBN starts when a DPU has joined.</p><p><b>Argo CD path:</b> press SYNC on <code>tenant-a-30-hbn</code>.</p>',
+        cmd: ['kubectl apply -f tenant-a/30-hbn/'],
+        out: ['dpuservicetemplate.svc.dpu.nvidia.com/doca-hbn-tenant-a created', 'dpuserviceconfiguration.svc.dpu.nvidia.com/doca-hbn-tenant-a created', 'dpuserviceipam.svc.dpu.nvidia.com/tenant-a-host created', 'dpuserviceipam.svc.dpu.nvidia.com/tenant-a-loopback created', 'dpuserviceinterface.svc.dpu.nvidia.com/tenant-a-p0 created', 'dpuserviceinterface.svc.dpu.nvidia.com/tenant-a-p1 created', 'dpuserviceinterface.svc.dpu.nvidia.com/tenant-a-pf0hpf created'],
+        hint: 'p0 and p1 are the two physical ports of the DPU. pf0hpf is the port that faces the server.', expect: 'Seven objects <b>created</b>',
+        quip: ['The network definitions. Nothing runs yet.', 'HBN is defined, waiting for a DPU.'] },
+      { id: 'ahw', title: 'Apply the hardware objects', focus: ['n-hw', 'n-dpu'], set: { hw: 1, hold: 1 },
+        text: '<p>Apply the hardware folder. DPF creates a <b>DPU</b> object and stops at the hold, because of <code>hold: true</code>.</p><p><b>From here on the next steps can erase and reinstall the DPU.</b> Check every value first.</p><p><b>Argo CD path:</b> press SYNC on <code>tenant-a-40-hardware</code>.</p>',
+        cmd: ['kubectl apply -f tenant-a/40-hardware/', 'kubectl -n {NS} get dpus,dpunodemaintenances'],
+        out: ['bfb.provisioning.dpu.nvidia.com/bf-bundle-v26.4.0 created', 'dpudeployment.svc.dpu.nvidia.com/hbn-tenant-a created', 'dpudevice.provisioning.dpu.nvidia.com/{DEV} created', 'dpuflavor.provisioning.dpu.nvidia.com/hbn-tenant-a-v26.4.0 created', 'dpunode.provisioning.dpu.nvidia.com/{NODE} created', '', 'NAME                                READY   PHASE         AGE', 'dpu/{NODE}-{DEV}   False   Node Effect   20s', '', 'NAME                                      AGE', 'dpunodemaintenance/{NODE}-hold   18s'],
+        hint: 'No DPU object? The label in file 3 and the selector in file 7 do not match.', expect: 'DPU in phase <b>Node Effect</b>, one hold object',
+        wrong: [['No DPU object appears', 'Compare the BMC address label in file 3 with the selector in file 7. They must be identical.'], ['The BFB stays in Downloading', 'The cluster cannot reach the image address. Check outbound access and DNS from the cluster.']],
+        quip: ['Careful: after this step DPF is ready to reinstall the DPU.', 'DPF is holding. It waits for you.'] },
+      { id: 'hold', title: 'Release the hold', focus: ['n-bmc', 'n-dpu'], set: { hold: 0, image: 1 },
+        text: '<p>When the server can be interrupted, release the hold. DPF then configures the firmware, sends the image to the BMC over Redfish and installs the DPU operating system. Expect about 20 minutes.</p>',
+        cmd: ['kubectl -n {NS} annotate dpunodemaintenance {NODE}-hold provisioning.dpu.nvidia.com/wait-for-external-nodeeffect=false --overwrite', 'kubectl -n {NS} get dpus -w'],
+        out: ['dpunodemaintenance.provisioning.dpu.nvidia.com/{NODE}-hold annotated', '', 'NAME                                READY   PHASE', 'dpu/{NODE}-{DEV}   False   Config FW Parameters', 'dpu/{NODE}-{DEV}   False   Prepare BFB', 'dpu/{NODE}-{DEV}   False   OS Installing', 'dpu/{NODE}-{DEV}   False   Rebooting'],
+        hint: 'In one recorded lab install the image transfer took about 5 minutes and the install about 13 more.', expect: 'Phase reaches <b>Rebooting</b>',
+        wrong: [['The phase stays at OS Installing for very long', 'Run kubectl -n {NS} describe dpu to read the conditions. BFBTransferred and OSInstalled show how far it got.'], ['The phase is Error', 'kubectl -n {NS} describe dpu shows the failing condition. BMC login and image download are the usual causes.']],
+        quip: ['One annotation tells DPF to go ahead.', 'The image is on the DPU. One more manual step.'] },
+      { id: 'reboot', title: 'Power-cycle the server', focus: ['n-host', 'n-dpu', 'n-cluster'], set: { reboot: 1, ready: 1 },
+        text: '<p>The example uses the restart method <b>external</b>: DPF waits until a person switches the server off and on. Wait for the DPU to ask for it, power-cycle the server through its own management interface, then confirm by removing one annotation.</p>',
+        cmd: ['kubectl -n {NS} wait dpu/{NODE}-{DEV} --for=\'jsonpath={.status.conditions[?(@.type=="Rebooted")].reason}=WaitingForManualPowerCycleOrReboot\' --timeout=1800s', '# now power-cycle the server, wait until it is back, then:', 'kubectl -n {NS} annotate dpunode {NODE} provisioning.dpu.nvidia.com/dpunode-external-reboot-required-', 'kubectl -n {NS} wait dpu/{NODE}-{DEV} --for=jsonpath=\'{.status.phase}\'=Ready --timeout=1800s'],
+        out: ['dpu.provisioning.dpu.nvidia.com/{NODE}-{DEV} condition met', '# (server switched off and on)', 'dpunode.provisioning.dpu.nvidia.com/{NODE} annotated', 'dpu.provisioning.dpu.nvidia.com/{NODE}-{DEV} condition met'],
+        hint: 'Power-cycle the server that holds the DPU. Never restart the management cluster nodes for this.', expect: 'DPU phase <b>Ready</b>',
+        wrong: [['The DPU stays in Rebooting', 'The annotation is still there, or the server did not lose power completely. A warm restart is not enough for the firmware change.'], ['The DPU stays in DPU Cluster Config', 'The DPU cannot reach the tenant-a VIP, or its clock or DNS is wrong.']],
+        quip: ['The second and last time DPF waits for a person.', 'The DPU is Ready and has joined tenant-a.'] },
+      { id: 'tenant', title: 'Check HBN in tenant-a', focus: ['n-cluster', 'n-hbn'], set: { hbn: 1 },
+        text: '<p><b>Ready</b> says the install finished. It does not say the network works. Look inside the tenant-a cluster: the DPU is listed as a node, and the HBN pod runs on it.</p>',
+        cmd: ["kubectl -n tenant-a get secret tenant-a-admin-kubeconfig -o jsonpath='{.data.admin\\.conf}' | base64 -d > /tmp/tenant-a.kubeconfig", 'kubectl --kubeconfig /tmp/tenant-a.kubeconfig get nodes', 'kubectl --kubeconfig /tmp/tenant-a.kubeconfig -n {NS} get pods -l app.kubernetes.io/name=hbn'],
+        out: ['NAME                STATUS   ROLES    AGE   VERSION', '{NODE}   Ready    <none>   4m    v1.34.0', '', 'NAME                      READY   STATUS    RESTARTS   AGE', 'doca-hbn-tenant-a-x7k2p   2/2     Running   0          3m'],
+        hint: 'The tenant cluster has its own kubeconfig, stored as a Secret in the tenant-a namespace.', expect: 'Node <b>Ready</b>, HBN pod <b>Running</b>',
+        wrong: [['The HBN pod is Pending', 'The interface files or the address pools are missing or do not carry the label tenant: tenant-a.']],
+        quip: ['Ready is not the finish line. Look inside tenant-a.', 'HBN is running on the DPU.'] },
+      { id: 'vxlan', title: 'Check VXLAN and traffic', focus: ['n-hbn', 'n-sw', 'n-host'], set: { vx: 1 },
+        text: '<p>The last proof. Inside HBN, the VRF exists and BGP is established with the switch on both ports. From the server, the gateway answers. Only this level shows that the site works.</p>',
+        cmd: ['# on the DPU: open a shell in the HBN container', 'sudo crictl exec -it $(sudo crictl ps -q --name hbn) bash', 'nv show vrf', 'vtysh -c "show bgp l2vpn evpn summary"', '# on the server:', 'ping -c 3 {GW}'],
+        out: ['VRF name    State  Table', '{VRF}    up     1001', 'default     up     254', '', 'Neighbor   V    AS      MsgRcvd  MsgSent  Up/Down   State/PfxRcd', 'p0_if      4    {SW_ASN}   412      398      00:03:12  6', 'p1_if      4    {SW_ASN}   409      397      00:03:10  6', '', 'L3 VNI {L3VNI} in VRF {VRF}, tunnel source {LO}', '', '3 packets transmitted, 3 received, 0% packet loss'],
+        hint: 'Both neighbours must show a number in the last column. A word such as Idle or Active means the session is down. Run the same command on the switch too.', expect: 'VRF <b>{VRF}</b> up, two BGP sessions, ping answers',
+        wrong: [['A neighbour shows Idle or Active', 'The two sides disagree. Compare remote-as on the switch with the ASN in file 5, and check that both links are up.'], ['Ping to the gateway fails', 'The server network setup is missing: it needs the address {HOSTIP} and the gateway {GW}.']],
+        quip: ['DPU + HBN + VXLAN: this step proves all three.', 'Done. The server reaches the network through VXLAN on the DPU.'] }
+    ] }
+  ];
+
+  // ---------- flatten, state ----------
+  var all = []; ACTS.forEach(function (a, ai) { a.steps.forEach(function (s, si) { s.a = a; s.ai = ai; s.si = si; s.key = a.id + '.' + s.id; all.push(s); }); });
+  var done = {}, curKey = all[0].key, running = false, timers = [];
+  function cur() { for (var i = 0; i < all.length; i++) if (all[i].key === curKey) return all[i]; return all[0]; }
+  function idx(s) { return all.indexOf(s); }
+  function save() { try { localStorage.setItem('dpf-only-workbench-v2', JSON.stringify({ done: done, cur: curKey, v: V, theme: document.documentElement.dataset.theme || '' })); } catch (e) { /* storage may be unavailable */ } }
+  function load() { try { var d = JSON.parse(localStorage.getItem('dpf-only-workbench-v2') || 'null'); if (!d) return; done = d.done || {}; if (d.cur && all.some(function (s) { return s.key === d.cur; })) curKey = d.cur; if (d.v) Object.keys(DEF).forEach(function (k) { if (typeof d.v[k] === 'string' && d.v[k]) V[k] = d.v[k]; }); if (d.theme === 'light' || d.theme === 'dark') document.documentElement.dataset.theme = d.theme; } catch (e) { /* ignore */ } }
+  function state() { var st = {}; all.forEach(function (s) { if (done[s.key] && s.set) Object.keys(s.set).forEach(function (k) { st[k] = s.set[k]; }); }); return st; }
+
+  // ---------- rail ----------
+  function renderRail() {
+    var h = '';
+    ACTS.forEach(function (a, ai) {
+      h += '<div class="acthead"><b>' + ai + ' · ' + esc(a.title) + '</b><small>' + esc(a.sub) + '</small></div>';
+      a.steps.forEach(function (s) { h += '<button type="button" class="step' + (done[s.key] ? ' done' : '') + (s.key === curKey ? ' cur' : '') + '" data-key="' + s.key + '"><span class="mark">' + (done[s.key] ? '✓' : '·') + '</span><span>' + esc(s.title) + '</span>' + (s.tag ? '<span class="tag">EDIT</span>' : '') + '</button>'; });
+    });
+    $('acts').innerHTML = h;
+    var n = all.filter(function (s) { return done[s.key]; }).length;
+    $('meter').style.width = (100 * n / all.length) + '%';
+    $('progress').textContent = n + ' / ' + all.length + ' complete';
+  }
+
+  // ---------- step view ----------
+  function yamlHtml(f) {
+    return f.y.split('\n').map(function (line) {
+      var ed = /\{[A-Z][A-Z0-9_]*\}/.test(line);
+      var html = esc(line).replace(/\{([A-Z][A-Z0-9_]*)\}/g, function (_, k) { return '<b>' + esc(val(k)) + '</b>'; });
+      if (ed) return '<span class="ed">' + html + '   <span class="arrow">← edit</span></span>';
+      return (/^\s*#/.test(line) || /#/.test(line) ? html.replace(/(#.*)$/, '<span class="k">$1</span>') : html) + '\n';
+    }).join('');
+  }
+  function cmdHtml(lines) { return lines.map(function (l) { l = fill(l); return /^#/.test(l) ? '<span class="cm">' + esc(l) + '</span>' : '<span class="p">$</span> ' + esc(l); }).join('\n'); }
+  function stepCmds(s) {
+    if (s.cmd) return s.cmd;
+    if (s.file) { var fp = FILES[s.file].path.split('  and  ')[0]; return ['vi ' + fp, 'kubectl apply --dry-run=server -f ' + fp]; }
+    return null;
+  }
+  function render() {
+    var s = cur();
+    $('eyebrow').textContent = 'ACT ' + s.ai + ' · ' + s.a.title.toUpperCase() + ' / STEP ' + (s.si + 1) + ' OF ' + s.a.steps.length;
+    $('title').textContent = s.title;
+    var t = fill(s.text);
+    if (s.tbl) t += '<table class="vals">' + s.tbl.map(function (k) { var f = FIELDS.filter(function (x) { return x[0] === k; })[0]; return '<tr><td>' + esc(val(k)) + '</td><td>' + esc(f[1]) + '</td></tr>'; }).join('') + '</table>';
+    if (s.tbl2) t += '<table class="vals">' + s.tbl2.map(function (r) { return '<tr><td>' + esc(fill(r[1])) + '</td><td>' + esc(r[0]) + '</td></tr>'; }).join('') + '</table>';
+    $('text').innerHTML = t;
+    if (s.file) {
+      var f = FILES[s.file];
+      $('filebox').innerHTML = '<div class="lbl">Your file <span class="filepath">' + esc(f.path) + '</span></div><div class="codebox yaml"><button class="copy" type="button" data-copy="path">Copy path</button>' + yamlHtml(f) + '</div><div class="note">Excerpt of the file the script created. Highlighted lines carry your value from Site values. To change one, change Site values and run the script again, or edit the file directly.</div>';
+    } else $('filebox').innerHTML = '';
+    $('bannerbox').innerHTML = s.banner ? '<div class="banner"><span class="big">' + esc(s.banner[0]) + '</span>' + fill(s.banner[1]) + '</div>' : '';
+    $('scenebox').innerHTML = s.scene ? SCENE[s.scene] : '';
+    $('infobox').innerHTML = (s.file && FILES[s.file].info) ? '<div class="lbl">What each value means</div><table class="info">' + FILES[s.file].info.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(fill(r[1])) + '</td></tr>'; }).join('') + '</table>' : '';
+    $('codesbox').innerHTML = (s.codes || []).map(function (c, i) { return '<div class="lbl">' + esc(c[0]) + '</div><div class="codebox tall"><button class="copy" type="button" data-copy="code:' + i + '">Copy</button>' + esc(fill(c[1])) + '</div>'; }).join('');
+    var c = stepCmds(s);
+    $('cmdbox').innerHTML = c ? '<div class="lbl">Commands</div><div class="codebox"><button class="copy" type="button" data-copy="cmd">Copy</button>' + cmdHtml(c) + '</div>' : '';
+    $('run').textContent = s.run || (s.file ? 'Check the file' : 'Run');
+    $('run').disabled = false;
+    $('next').hidden = !done[s.key] || idx(s) === all.length - 1;
+    $('expect').innerHTML = s.expect ? 'Expect: ' + fill(s.expect) : '';
+    $('hint').hidden = true; $('hint').innerHTML = fill(s.hint || '');
+    $('result').textContent = done[s.key] ? 'Step complete.' : '';
+    renderRail(); draw();
+    $('footright').textContent = 'Step ' + (idx(s) + 1) + ' of ' + all.length;
+  }
+
+  // ---------- simulated terminal ----------
+  var term = $('term');
+  function tw(html) { term.insertAdjacentHTML('beforeend', html); term.scrollTop = term.scrollHeight; }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function stopTimers() { timers.forEach(clearTimeout); timers = []; running = false; }
+  function colour(line) {
+    var e = esc(line);
+    if (/^#/.test(line)) return '<span class="d">' + e + '</span>';
+    return e.replace(/\b(PASS|Ready|SUCCESS|SUCCEEDED|Match|Accepted|created|condition met|annotated|Running|UP|up|In range)\b/g, '<span class="ok">$1</span>').replace(/\b(Missing|REVIEW NEEDED|Node Effect|Rebooting|DRY RUN)\b/g, '<span class="warn">$1</span>');
+  }
+  function run() {
+    var s = cur(); if (running) return;
+    if (s.act === 'values') { openDrawer(); finish(s); return; }
+    running = true; $('run').disabled = true; $('result').textContent = '';
+    var cmds = (stepCmds(s) || []).map(fill), out = (s.out || (s.file ? [FILES[s.file].path.split('  and  ')[0].split('/').pop().replace('.yaml', '') + ' configured (server dry run)'] : [])).map(fill);
+    var t = 0;
+    cmds.forEach(function (c) { later(function () { tw(/^#/.test(c) ? '<span class="d">' + esc(c) + '</span>\n' : '<span class="p">$</span> <span class="c">' + esc(c) + '</span>\n'); }, t); t += 260; });
+    out.join('\n').split('\n').forEach(function (line) { later(function () { tw(colour(line) + '\n'); }, t); t += 55; });
+    later(function () { tw('\n'); finish(s); }, t + 150);
+  }
+  function finish(s) {
+    running = false; done[s.key] = true; save();
+    $('run').disabled = false; $('next').hidden = idx(s) === all.length - 1;
+    $('result').textContent = idx(s) === all.length - 1 ? 'All steps complete: DPU + HBN + VXLAN.' : 'Step complete.';
+    renderRail(); draw(); botAfter(s);
+  }
+  function go(key) { stopTimers(); curKey = key; save(); render(); botBefore(cur()); }
+
+  // ---------- diagram ----------
+  var NODES = ['n-admin', 'n-pre', 'n-op', 'n-secret', 'n-cluster', 'n-hbndef', 'n-hw', 'n-host', 'n-bmc', 'n-dpu', 'n-hbn', 'n-sw'];
+  var NAMES = { 'n-admin': 'admin terminal', 'n-pre': 'prerequisites', 'n-op': 'DPF operator', 'n-secret': 'BMC Secret', 'n-cluster': 'tenant cluster', 'n-hbndef': 'HBN + VXLAN objects', 'n-hw': 'hardware objects', 'n-host': 'host', 'n-bmc': 'DPU BMC', 'n-dpu': 'DPU', 'n-hbn': 'HBN', 'n-sw': 'switch' };
+  function setNode(id, cls, text, sid) { var n = $(id); n.classList.remove('ok', 'wait'); if (cls) n.classList.add(cls); if (sid) $(sid).textContent = text; }
+  function link(id, on, flow) { var l = $(id); l.classList.toggle('on', !!on); l.classList.toggle('flow', !!flow); }
+  function draw() {
+    var s = cur(), st = state();
+    setNode('n-pre', st.pre ? 'ok' : '', st.pre ? 'installed ✓' : 'missing', 's-pre');
+    setNode('n-op', st.op ? 'ok' : '', st.cluster ? 'configured ✓' : st.op ? 'installed ✓' : 'missing', 's-op');
+    setNode('n-secret', st.secret ? 'ok' : '', st.secret ? 'saved ✓' : 'missing', 's-secret');
+    setNode('n-cluster', st.cluster ? 'ok' : '', st.ready ? 'Ready · 1 DPU node' : st.cluster ? 'Ready at ' + V.VIP : 'not created', 's-cluster');
+    setNode('n-hbndef', st.hbndef ? 'ok' : '', st.hbndef ? 'VRF ' + V.VRF + ' · VNI ' + V.L3VNI : 'not applied', 's-hbndef');
+    setNode('n-hw', st.hw ? (st.hold ? 'wait' : 'ok') : '', st.hw ? (st.hold ? 'applied · held, waiting for you' : 'applied ✓') : 'not applied', 's-hw');
+    setNode('n-bmc', st.secret ? 'ok' : '', st.secret ? V.BMC_IP + ' ✓' : 'untested', 's-bmc');
+    setNode('n-dpu', st.ready ? 'ok' : (st.hold || (st.image && !st.ready)) ? 'wait' : '', st.ready ? 'Ready ✓' : st.image ? 'image written · needs power cycle' : st.hold ? 'Node Effect (held)' : 'no image', 's-dpu');
+    setNode('n-hbn', st.hbn ? 'ok' : '', st.vx ? 'BGP up · VNI ' + V.L3VNI : st.hbn ? 'Running ✓' : 'not running', 's-hbn');
+    setNode('n-host', st.vx ? 'ok' : '', st.vx ? 'gateway ' + hostAddr(2) + ' ✓' : 'no gateway yet', 's-host');
+    setNode('n-sw', (st.vx || st.sw) ? 'ok' : '', '', null);
+    $('t-sw').textContent = (st.sw ? 'switch configured ✓ · VNI ' : 'switch · VXLAN VNI ') + V.L3VNI;
+    link('l-admin', true); link('l-pre-op', st.pre); link('l-op-cluster', st.cluster); link('l-op-secret', st.secret); link('l-objs', st.hbndef);
+    link('l-redfish', st.hw, st.image && !st.ready); link('l-join', st.ready); link('l-host', st.vx); link('l-vx', st.hbn, st.vx);
+    var hot = s.focus || [];
+    NODES.forEach(function (id) { $(id).classList.toggle('hot', hot.indexOf(id) >= 0); $(id).classList.toggle('dimmed', hot.length > 0 && hot.indexOf(id) < 0 && !$(id).classList.contains('ok') && !$(id).classList.contains('wait')); });
+    $('herefocus').textContent = hot.map(function (id) { return NAMES[id]; }).join(' · ');
+    var parts = []; if (st.pre) parts.push('prerequisites'); if (st.op) parts.push('operator'); if (st.secret) parts.push('BMC Secret'); if (st.cluster) parts.push('tenant cluster'); if (st.hbndef) parts.push('HBN objects'); if (st.hw) parts.push('hardware objects'); if (st.sw) parts.push('switch'); if (st.ready) parts.push('DPU Ready'); if (st.hbn) parts.push('HBN'); if (st.vx) parts.push('VXLAN');
+    $('herestate').textContent = parts.length ? parts.join(' · ') : 'nothing installed yet';
+    $('topometa').textContent = parts.length + ' of 10 in place';
+  }
+
+  // ---------- the guide bot ----------
+  var quipTimer = 0;
+  function say(text, sub, ms) { var q = $('quip'); q.innerHTML = esc(text) + (sub ? '<small>' + esc(sub) + '</small>' : ''); q.classList.add('show'); clearTimeout(quipTimer); quipTimer = setTimeout(function () { q.classList.remove('show'); }, ms || 7000); }
+  function hop() { var f = $('furry'); if (!f) return; f.classList.remove('excited'); void f.offsetWidth; f.classList.add('excited'); }
+  function botBefore(s) { if (!$('guide').hidden) return; say((s.quip || [s.title])[0], 'click me for help'); }
+  function botAfter(s) { hop(); if (!$('guide').hidden) { addBot('Step complete: <b>' + esc(s.title) + '</b>. ' + esc((s.quip || ['', 'Done.'])[1])); return; } say((s.quip || ['', 'Done.'])[1]); }
+
+  var KB = [
+    { k: ['file', 'files', 'yaml', 'edit', 'touch', 'change'], q: 'Which files do I edit?', a: function () { return 'The script in part 5 writes 15 files into <code>tenant-a/</code>. Seven carry your values:<ul><li><b>1</b> 10-operator/operatorconfig.yaml: API address</li><li><b>2</b> 20-cluster/dpucluster.yaml: VIP, interface, router id</li><li><b>3</b> 40-hardware/dpudevice.yaml: BMC address, serial, part number</li><li><b>4</b> 40-hardware/dpuflavor.yaml: DNS server</li><li><b>5</b> 30-hbn/hbn-config.yaml: VRF, L3 VNI, ASN</li><li><b>6</b> 30-hbn/ipam-host.yaml and ipam-loopback.yaml: the two address pools</li><li><b>7</b> 40-hardware/dpudeployment.yaml: the BMC address selector</li></ul>'; } },
+    { k: ['argo', 'gitops', 'one click', 'prereq', 'prerequisite', 'sync'], q: 'Does Argo CD install the prerequisites?', a: function () { return 'Yes. One Argo CD Application, <b>dpf-platform</b>, installs all prerequisites and the DPF operator. In the Argo CD screen that is one click on SYNC. It replaces parts 2 and 3. Argo CD itself is installed once with Helm. Use one path per cluster: installer or Argo CD.'; } },
+    { k: ['serial', 'opn', 'psid', 'part number', 'model', 'label'], q: 'What are serial number and OPN?', a: function () { return '<b>serialNumber</b> is the serial number of one card: yours is <code>' + esc(V.SERIAL) + '</code>. <b>opn</b> is the ordering part number, the exact model: <code>' + esc(V.OPN) + '</code>. Both are printed on the card label and reported by the BMC. The labels <code>dpudevice-psid</code> and <code>dpudevice-opn</code> repeat the same two values so that other objects can search for the card.'; } },
+    { k: ['vrf', 'asn', 'autonomous', 'vni', 'vxlan', 'evpn', 'bgp', 'tunnel'], q: 'What do VRF, VNI and ASN mean?', a: function () { return '<b>VRF</b> <code>' + esc(V.VRF) + '</code>: the routing table of tenant-a, kept apart from other tenants. <b>L3 VNI</b> <code>' + esc(V.L3VNI) + '</code>: the number written into every VXLAN packet of tenant-a. <b>ASN</b> <code>' + esc(V.ASN) + '</code>: the number HBN uses when it exchanges routes with the switch over BGP. The switch must use the same VRF and VNI, and must accept that ASN while keeping its own, <code>' + esc(V.SW_ASN) + '</code>.'; } },
+    { k: ['switch', 'cumulus', 'nvue', 'nv set', 'port', 'route target'], q: 'How do I configure the switch?', a: function () { return 'Part 6 has the Cumulus commands, filled with your values. In short: make ports <code>' + esc(V.SW_PORTS) + '</code> routed, run BGP unnumbered to the DPU with remote AS <code>' + esc(V.ASN) + '</code>, turn on EVPN and VXLAN with source <code>' + esc(V.SW_LO) + '</code>, create VRF <code>' + esc(V.VRF) + '</code> with VNI <code>' + esc(V.L3VNI) + '</code>, and use route target <code>' + esc(V.ASN) + ':' + esc(V.L3VNI) + '</code>.'; } },
+    { k: ['vip', 'virtual', 'keepalived', 'vrrp', 'router id'], q: 'What is the VIP?', a: function () { return 'The VIP is a free address for the API of the tenant-a cluster. Yours is <code>' + esc(V.VIP) + '</code> on interface <code>' + esc(V.VIP_IF) + '</code>. It must be reserved outside the DHCP range, nothing else may answer on it, and the VRRP router id <code>' + esc(V.VRID) + '</code> must be unique on that network.'; } },
+    { k: ['stuck', 'wait', 'waiting', 'hang', 'hold', 'phase', 'slow', 'nothing happens'], q: 'My DPU is stuck', a: function () { return 'DPF waits for a person at two points:<ul><li><b>Node Effect</b>: the hold. Release it with <code>kubectl -n ' + FIXED.NS + ' annotate dpunodemaintenance ' + FIXED.NODE + '-hold provisioning.dpu.nvidia.com/wait-for-external-nodeeffect=false --overwrite</code></li><li><b>Rebooting</b>: power-cycle the server, then <code>kubectl -n ' + FIXED.NS + ' annotate dpunode ' + FIXED.NODE + ' provisioning.dpu.nvidia.com/dpunode-external-reboot-required-</code></li></ul>For any other phase, <code>kubectl -n ' + FIXED.NS + ' describe dpu</code> shows the condition that blocks it.'; } },
+    { k: ['reboot', 'power', 'cycle', 'restart'], q: 'When do I power-cycle?', a: function () { return 'Only when the DPU asks for it: its <code>Rebooted</code> condition shows the reason <code>WaitingForManualPowerCycleOrReboot</code>. Switch the server that holds the DPU fully off and on. Never restart the management cluster nodes for this. Then remove the annotation as shown in the step "Power-cycle the server".'; } },
+    { k: ['tenant', 'tenant-a', 'second tenant', 'tenant-b', 'another'], q: 'Why tenant-a, and how do I add another?', a: function () { return 'The guide starts with one tenant so there is one of everything to follow. A second tenant repeats parts 5 to 7 with its own VIP, router id, VRF, VNI, ASN and address pools. The repository example it is built from already shows two tenants side by side.'; } },
+    { k: ['dpu', 'what is', 'bluefield', 'card', 'nic mode', 'zero-trust', 'zero trust'], q: 'What is a DPU?', a: function () { return 'A DPU is a network card with its own processor, operating system and management controller (BMC). It sits between the server and the network. In DPU mode every packet of the server passes through software on the card: here that software is HBN. Part 0, DPU 101, explains it in four steps.'; } },
+    { k: ['bmc', 'password', 'secret', 'redfish', 'login', 'credential'], q: 'Where does the BMC password go?', a: function () { return 'Into a Kubernetes Secret named <code>bmc-shared-password</code>, created by <code>python3 installer/lab/create-bmc-secret.py</code>. It is typed at a prompt and never written to a file or to Git. Test access first with <code>./dpf-install.sh --check-bmc</code>.'; } },
+    { k: ['ready', 'done', 'finished', 'working', 'prove', 'verify'], q: 'How do I know it works?', a: function () { return 'Three levels, in order:<ul><li>The DPU shows phase <b>Ready</b>: the install finished.</li><li>In the tenant-a cluster the DPU is a node and the <b>HBN pod runs</b>.</li><li>Inside HBN the VRF is up with two BGP sessions, and the server reaches its gateway <code>' + esc(hostAddr(2)) + '</code>.</li></ul>Only the last level shows that the site works.'; } },
+    { k: ['dhcp', 'oob', 'lease'], q: 'Do I need DHCP?', a: function () { return 'Yes. The operating system on the DPU gets its management address from DHCP, during the install and after every restart. This workbench does not install DHCP. Keep the VIP outside the DHCP range.'; } },
+    { k: ['version', 'versions', 'chart', 'pin'], q: 'Which versions are installed?', a: function () { return 'DPF operator v26.4.0 with cert-manager v1.19.3, Argo CD 9.4.1, Node Feature Discovery 0.18.3, Maintenance Operator 0.3.0, Kamaji 1.2.0 and, only when the cluster has no storage, local-path 0.0.34.'; } },
+    { k: ['clean', 'uninstall', 'remove', 'reset', 'delete', 'start over'], q: 'How do I start over?', a: function () { return '<code>./dpf-install.sh --clean</code> shows what a full reset would remove and changes nothing. Only <code>--clean --yes</code> executes it. A reset removes the tenant cluster and its data. It does not wipe a DPU.'; } },
+    { k: ['error', 'fail', 'failed', 'broken', 'diagnose', 'log', 'logs'], q: 'Something failed', a: function () { return 'Start with <code>./dpf-install.sh --diagnose --more</code>: it lists unhealthy pods, volumes and recent warning events. Installer output is in <code>installer/logs/latest.log</code>. For a DPU, <code>kubectl -n ' + FIXED.NS + ' describe dpu</code> shows which condition is false.'; } },
+    { k: ['dry', 'preview', 'safe'], q: 'What is safe to run?', a: function () { return 'Everything in part 2 only reads, except the storage check, which creates and removes a small test volume. <code>--dry-run</code> and <code>--clean</code> without <code>--yes</code> change nothing. The first step that can touch a DPU is "Apply the hardware objects" followed by "Release the hold".'; } },
+    { k: ['hbn', 'pod', 'pending', 'container'], q: 'HBN is not running', a: function () { return 'HBN starts only after the DPU has joined the tenant-a cluster. If the pod stays Pending, check that the 30-hbn folder was applied and that its files carry the label <code>tenant: tenant-a</code>.'; } },
+    { k: ['simulat', 'real', 'fake', 'actual'], q: 'Is this real?', a: function () { return 'The commands, file names and field names are real. The terminal output is simulated, so the workbench can be used without a cluster. Run the commands in your own terminal and compare.'; } }
+  ];
+  function addMsg(cls, html) { var d = document.createElement('div'); d.className = 'msg ' + cls; d.innerHTML = html; $('chat').appendChild(d); $('chat').scrollTop = $('chat').scrollHeight; }
+  function addBot(html) { addMsg('them', html); }
+  function chipsHtml(list) { return '<div class="chips">' + list.map(function (e) { return '<button type="button" class="chip" data-q="' + esc(e.q) + '">' + esc(e.q) + '</button>'; }).join('') + '</div>'; }
+  function answer(q) {
+    var words = q.toLowerCase(), best = null, score = 0;
+    KB.forEach(function (e) { var s = 0; e.k.forEach(function (k) { if (words.indexOf(k) >= 0) s += k.length; }); if (e.q.toLowerCase() === words) s += 100; if (s > score) { score = s; best = e; } });
+    if (best) { addBot(best.a()); return; }
+    addBot('I only know this install path. Try one of these:' + chipsHtml(KB.slice(0, 6)));
+  }
+  function stepHelp() {
+    var s = cur(), h = '<b>' + esc(s.title) + '</b><br>' + fill(s.hint || '');
+    if (s.wrong) h += '<br><br><b>If it goes wrong</b><ul>' + s.wrong.map(function (w) { return '<li><b>' + esc(fill(w[0])) + '</b>: ' + esc(fill(w[1])) + '</li>'; }).join('') + '</ul>';
+    var n = all[idx(s) + 1]; h += '<br><small>' + (done[s.key] ? (n ? 'Done. Next: ' + esc(n.title) + '.' : 'This was the last step.') : 'Press the green button to run this step.') + '</small>';
+    addBot(h);
+  }
+  function openGuide() {
+    $('guide').hidden = false; $('quip').classList.remove('show');
+    if (!$('chat').children.length) addBot('I am a scripted guide for this install path. I know the steps, the seven files and the usual problems.' + chipsHtml([{ q: 'Help with this step' }].concat(KB.slice(0, 5))));
+    else stepHelp();
+    $('askin').focus();
+  }
+
+  // ---------- site values drawer ----------
+  function renderFields() {
+    $('fields').innerHTML = FIELDS.map(function (f) {
+      if (f[1] === null) return '<div class="grp">' + esc(f[0]) + '</div>';
+      return '<div class="fld"><label for="v-' + f[0] + '"><b>' + f[0] + '</b> · ' + esc(f[1]) + '</label><input id="v-' + f[0] + '" data-k="' + f[0] + '" type="text" autocomplete="off" spellcheck="false" value="' + esc(V[f[0]]) + '" class="' + (V[f[0]] !== DEF[f[0]] ? 'changed' : '') + '"></div>';
+    }).join('');
+  }
+  function openDrawer() { renderFields(); $('drawer').hidden = false; $('valbtn').classList.add('on'); }
+  function closeDrawer() { $('drawer').hidden = true; $('valbtn').classList.remove('on'); }
+
+  // ---------- wiring ----------
+  $('acts').addEventListener('click', function (e) { var b = e.target.closest('.step'); if (b) go(b.dataset.key); });
+  $('run').addEventListener('click', run);
+  $('next').addEventListener('click', function () { var n = all[idx(cur()) + 1]; if (n) go(n.key); });
+  $('hintbtn').addEventListener('click', function () { $('hint').hidden = !$('hint').hidden; });
+  $('clear').addEventListener('click', function () { stopTimers(); term.innerHTML = ''; $('run').disabled = false; });
+  function effTheme() { var d = document.documentElement.dataset.theme; return d === 'light' || d === 'dark' ? d : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }
+  $('theme').addEventListener('click', function () { document.documentElement.dataset.theme = effTheme() === 'light' ? 'dark' : 'light'; $('theme').textContent = effTheme() === 'light' ? 'Dark' : 'Light'; save(); });
+  var resetArmed = 0;
+  $('reset').addEventListener('click', function () {
+    if (!resetArmed) { resetArmed = 1; $('reset').textContent = 'Click again to reset'; setTimeout(function () { resetArmed = 0; $('reset').textContent = 'Reset progress'; }, 3000); return; }
+    resetArmed = 0; $('reset').textContent = 'Reset progress'; stopTimers(); done = {}; curKey = all[0].key; term.innerHTML = ''; save(); render();
+  });
+  $('valbtn').addEventListener('click', function () { if ($('drawer').hidden) openDrawer(); else closeDrawer(); });
+  $('dclose').addEventListener('click', closeDrawer);
+  $('vreset').addEventListener('click', function () { V = Object.assign({}, DEF); save(); renderFields(); render(); });
+  $('fields').addEventListener('input', function (e) { var k = e.target.dataset.k; if (!k) return; V[k] = e.target.value.trim() || DEF[k]; e.target.classList.toggle('changed', V[k] !== DEF[k]); save(); render(); });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.copy'); if (!b) return;
+    var s = cur(), k = b.dataset.copy, text = k === 'path' ? FILES[s.file].path.split('  and  ')[0] : k.indexOf('code:') === 0 ? fill(s.codes[Number(k.slice(5))][1]) : (stepCmds(s) || []).map(fill).filter(function (l) { return !/^#/.test(l); }).join('\n');
+    var okay = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = k === 'path' ? 'Copy path' : 'Copy'; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(okay, function () { b.textContent = 'Select and copy'; }); else b.textContent = 'Select and copy';
+  });
+  var furry = $('furry');
+  if (furry) furry.addEventListener('click', function () { if ($('guide').hidden) openGuide(); else $('guide').hidden = true; });
+  $('gclose').addEventListener('click', function () { $('guide').hidden = true; });
+  $('chat').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (!c) return; var q = c.dataset.q; addMsg('me', esc(q)); if (q === 'Help with this step') stepHelp(); else answer(q); });
+  $('askform').addEventListener('submit', function (e) { e.preventDefault(); var q = $('askin').value.trim(); if (!q) return; $('askin').value = ''; addMsg('me', esc(q)); if (/this step|here|now|help/i.test(q) && q.length < 28) stepHelp(); else answer(q); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('drawer').hidden) closeDrawer(); else if (!$('guide').hidden) $('guide').hidden = true; } });
+
+  load();
+  // Optional address parameters: ?step=edit.f5  ?done=1 (mark earlier steps done)  ?guide=1  ?values=1  ?theme=light  ?selftest=1
+  var qs = new URLSearchParams(location.search), errs = [];
+  window.addEventListener('error', function (e) { errs.push(String(e.message)); });
+  if (qs.get('theme')) document.documentElement.dataset.theme = qs.get('theme') === 'light' ? 'light' : 'dark';
+  if (qs.get('step') && all.some(function (s) { return s.key === qs.get('step'); })) { curKey = qs.get('step'); if (qs.get('done')) { done = {}; all.slice(0, idx(cur())).forEach(function (s) { done[s.key] = true; }); } }
+  $('theme').textContent = effTheme() === 'light' ? 'Dark' : 'Light';
+  render();
+  if (qs.get('selftest')) {
+    var rep = { steps: all.length, tokens: [], empty: [], kb: 0 };
+    try {
+      done = {}; term.innerHTML = '';
+      all.forEach(function (s) {
+        curKey = s.key; render();
+        var txt = $('app').textContent, m = txt.match(/\{[A-Z][A-Z0-9_]+\}/g); if (m) rep.tokens.push(s.key + ':' + m.join(','));
+        var c = (stepCmds(s) || []).map(fill).concat((s.out || []).map(fill)).join('\n'), m2 = c.match(/\{[A-Z][A-Z0-9_]+\}/g); if (m2) rep.tokens.push(s.key + ':cmd:' + m2.join(','));
+        if (!s.text || !s.hint || !s.expect || !s.quip) rep.empty.push(s.key);
+        done[s.key] = true;
+      });
+      render(); rep.state = state(); rep.done = Object.keys(done).length;
+      KB.forEach(function (e) { addMsg('me', esc(e.q)); answer(e.q); rep.kb++; }); stepHelp(); answer('zzz unknown question');
+      rep.chat = $('chat').children.length;
+    } catch (e) { errs.push(String(e && e.stack || e)); }
+    rep.errors = errs; rep.ok = !errs.length && !rep.tokens.length && !rep.empty.length && rep.done === all.length;
+    var pre = document.createElement('pre'); pre.id = 'selftest'; pre.textContent = JSON.stringify(rep); document.body.appendChild(pre);
+  } else {
+    if (qs.get('guide')) openGuide();
+    if (qs.get('values')) openDrawer();
+    setTimeout(function () { botBefore(cur()); }, 600);
+  }
+})();
+</script>
+</body>
+</html>
