@@ -87,5 +87,8 @@ else
 fi
 apply_state "$run/helmfiles/prereqs.yaml" "$run/install.log"
 helm --kube-context "$context" list -A -o json > "$run/releases.json"
-python3 "$base/tools/prereq_status.py" --context "$context" --storage-class "$storage"
+# Exit 1 only means "something is missing" (dpf-operator is installed next); 2 is a real read error.
+status_code=0
+python3 "$base/tools/prereq_status.py" --context "$context" --storage-class "$storage" || status_code=$?
+[[ "$status_code" -le 1 ]] || exit "$status_code"
 echo 'Prerequisites installed and ready.'

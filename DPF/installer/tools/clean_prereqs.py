@@ -66,6 +66,23 @@ def config_targets(items,resource):
             and not (resource=='configmaps' and o['metadata']['name']=='kube-root-ca.crt')]
 
 
+LEFTOVER_KINDS='roles,rolebindings,clusterroles,clusterrolebindings,mutatingwebhookconfigurations,validatingwebhookconfigurations,apiservices'
+
+
+def orphans(context):
+    """Helm-labelled RBAC/webhook objects (any namespace, e.g. kube-system) of a lab
+    release that is no longer installed. They block a fresh `helm install`
+    ('exists and cannot be imported into the current release')."""
+    k=['kubectl',f'--context={context}','--request-timeout=30s']
+    installed={r['name'] for r in read_json(['helm','--kube-context',context,'list','-A',*LIST_FLAGS,'--max','10000','-o','json'])
+               if r['status']!='uninstalled'}
+    names=sorted({t[0] for t in TARGETS}-installed)
+    if not names:return []
+    selector='app.kubernetes.io/managed-by=Helm,app.kubernetes.io/instance in ('+','.join(names)+')'
+    items=read_json([*k,'get',LEFTOVER_KINDS,'-A','-l',selector,'-o','json'])['items']
+    return [identity(o,o['kind'].lower()) for o in items]
+
+
 def inventory(context,delete_storage=False):
     k=['kubectl',f'--context={context}','--request-timeout=30s']
     all_releases=read_json(['helm','--kube-context',context,'list','-A',*LIST_FLAGS,'--max','10000','-o','json'])
@@ -113,7 +130,7 @@ def inventory(context,delete_storage=False):
             record['reclaimPolicy']=obj['spec'].get('persistentVolumeReclaimPolicy','Unknown')
             pvs.append(record)
     plan={'context':context,'releases':releases,'crds':[identity(o,'customresourcedefinitions') for o in definitions],
-          'custom':custom,'configs':configs,'pvcs':claims,'pvs':pvs,'delete_storage':delete_storage}
+          'custom':custom,'configs':configs,'orphans':orphans(context),'pvcs':claims,'pvs':pvs,'delete_storage':delete_storage}
     check_volume_retention(context,plan)
     return plan
 
@@ -148,18 +165,19 @@ def show(plan,more=False):
         table([[r['name'],r['status'].capitalize(),'Remove'] for r in plan['releases']],['COMPONENT','STATUS','ACTION'])
         print()
     rows=[['Custom resources',len(plan['custom']),'Delete'],['DPF / prerequisite CRDs',len(plan['crds']),'Delete'],
+          ['Orphaned Helm RBAC/webhooks',len(plan['orphans']),'Delete'],
           ['Secrets',sum(o['resource']=='secrets' for o in plan['configs']),'Delete'],
           ['ConfigMaps',sum(o['resource']=='configmaps' for o in plan['configs']),'Delete'],
           ['Persistent claims',len(plan['pvcs']),'Delete' if plan['delete_storage'] else 'Keep'],
           ['Lab-bound volumes',len(plan['pvs']),'Delete' if plan['delete_storage'] else 'Keep']]
     table(rows,['RESOURCE','COUNT','ACTION'])
-    print('\nScope: dpf-operator-system, cert-manager, dpu-cplane-tenant1.')
+    print('\nScope: dpf-operator-system, cert-manager, dpu-cplane-tenant1, plus leftover RBAC/webhooks of removed lab releases in any namespace (e.g. kube-system).')
     print('Keep: Kubernetes/CNI, namespaces, kube-root-ca, storage provisioner and StorageClasses.')
     if plan['delete_storage']:
         outcome('warn','Storage deletion selected. Backend data removal follows the PV reclaim policy.')
     if more:
         print('\nExact resource scope:')
-        objects=plan['custom']+plan['crds']+plan['configs']+plan['pvcs']+plan['pvs']
+        objects=plan['custom']+plan['crds']+plan['orphans']+plan['configs']+plan['pvcs']+plan['pvs']
         table([[o['resource'],o['namespace'] or '-',o['name']] for o in objects],['KIND','NAMESPACE','NAME'])
         if plan['pvs']:table([[o['name'],o['reclaimPolicy']] for o in plan['pvs']],['PV','RECLAIM POLICY'])
         print('\nRuntime objects are deleted before their controllers. No force/finalizer bypass or hardware reset.')
@@ -226,6 +244,8 @@ def run(context,execute,seconds,more=False,delete_storage=False):
     for index,release in enumerate(plan['releases'],1):
         print(f'  [{index}/{len(plan["releases"])}] Removing {release["name"]}...',flush=True)
         uninstall(context,release,seconds,run_dir/(release['name']+'.log'))
+    # Leftovers of releases removed earlier (e.g. cert-manager leader-election RoleBinding in kube-system).
+    delete_objects(k,orphans(context),seconds,run_dir/'orphans.log')
     # Helm may already have removed a CRD without a keep annotation.
     delete_objects(k,plan['crds'],seconds,run_dir/'crds.log')
     # Relist generated Secrets/ConfigMaps after controllers stop. Never save values.
@@ -237,7 +257,7 @@ def run(context,execute,seconds,more=False,delete_storage=False):
         delete_objects(k,plan['pvcs'],seconds,run_dir/'storage.log')
         delete_objects(k,plan['pvs'],seconds,run_dir/'storage.log')
     remaining=inventory(context,delete_storage)
-    if remaining['releases'] or remaining['crds'] or remaining['configs'] or remaining['custom'] or (delete_storage and (remaining['pvcs'] or remaining['pvs'])):
+    if remaining['releases'] or remaining['crds'] or remaining['configs'] or remaining['custom'] or remaining['orphans'] or (delete_storage and (remaining['pvcs'] or remaining['pvs'])):
         raise RuntimeError('Some lab objects remain. Inspect --clean --more before retrying.')
     outcome('complete','DPF lab configuration removed. Storage '+('deletion requested.' if delete_storage else 'kept.'))
     print('Next: 3 Install prerequisites, then 9 Install DPF.')

@@ -116,7 +116,9 @@ def report(context, storage, diagnose=False, more=False):
                      'Configured' if default else '-', '-'])
     sc = next((s for s in classes if s['metadata']['name'] == storage), None)
     if sc:
-        is_local = sc.get('provisioner') == 'rancher.io/local-path'
+        # Upstream uses rancher.io/local-path; the bundled chart can be configured
+        # with a custom name such as cluster.local/local-path-provisioner.
+        is_local = 'local-path' in sc.get('provisioner', '')
         found = [w for w in workloads if belongs(w, 'local-path-provisioner')] if is_local else []
         images = sorted({c['image'].rsplit(':', 1)[-1] for w in found
                          for c in w.get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
