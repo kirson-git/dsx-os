@@ -17,3 +17,9 @@ DPF/user-documentation/versions/
 
 # real site values (addresses, serial numbers) and the YAML generated from them; local only
 DPF/dpu-lab/site/
+
+# local agent skill; not part of the repo
+.agents/skills/dsx-dpf-argo/
+
+# demo/video material with real values and passwords; local only
+DPF/internal/
