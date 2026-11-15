@@ -1,7 +1,7 @@
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceConfiguration
 metadata:
-  name: doca-hbn-tenant-a
+  name: doca-hbn-lab
   namespace: dpf-operator-system
   annotations:
     argocd.argoproj.io/sync-wave: '80'
@@ -19,12 +19,12 @@ spec:
       values:
         configuration:
           perDPUValuesYAML: |
-            - hostnamePattern: dpu-node-tenant-a*
+            - hostnamePattern: dpu-node-lab*
               values:
                 bgp_peer_group: hbn
-                vrf1: TENANT_A
-                l3vni1: 100010
-                bgp_autonomous_system: 65010
+                vrf1: EUROPE  # please change here: same name as the VRF on the switch
+                l3vni1: 100001  # please change here: same number as the VNI of that VRF on the switch
+                bgp_autonomous_system: 65101  # please change here: must equal remote-as of the switch peer group for this DPU
           startupYAMLJ2: |
             - header:
                 model: bluefield
@@ -124,7 +124,7 @@ spec:
                         enable: on
     serviceDaemonSet:
       annotations:
-        k8s.v1.cni.cncf.io/networks: '[{"name": "iprequest", "interface": "ip_lo", "cni-args": {"poolNames": ["tenant-a-loopback"], "poolType": "cidrpool"}}, {"name": "iprequest", "interface": "ip_pf0hpf",
-          "cni-args": {"poolNames": ["tenant-a-host"], "poolType": "cidrpool", "allocateDefaultGateway": true}}]'
+        k8s.v1.cni.cncf.io/networks: '[{"name": "iprequest", "interface": "ip_lo", "cni-args": {"poolNames": ["lab-loopback"], "poolType": "cidrpool"}}, {"name": "iprequest", "interface": "ip_pf0hpf",
+          "cni-args": {"poolNames": ["lab-host"], "poolType": "cidrpool", "allocateDefaultGateway": true}}]'
   upgradePolicy:
     applyNodeEffect: false

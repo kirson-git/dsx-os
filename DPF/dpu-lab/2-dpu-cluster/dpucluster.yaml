@@ -1,0 +1,20 @@
+apiVersion: provisioning.dpu.nvidia.com/v1alpha1
+kind: DPUCluster
+metadata:
+  name: dpu-cluster-lab
+  namespace: dpu-cluster-lab
+  labels:
+    training.dpf.nvidia.com/tenant: lab
+  annotations:
+    argocd.argoproj.io/sync-wave: '70'
+spec:
+  clusterEndpoint:
+    keepalived:
+      interface: enp7s0  # please change here: management-node NIC on the DPU network
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ''
+      vip: 192.0.2.200  # please change here: reserved floating IP, outside DHCP
+      virtualRouterID: 126  # please change here: unique VRRP id
+  kubeconfig: dpu-cluster-lab-admin-kubeconfig
+  maxNodes: 1000
+  type: kamaji

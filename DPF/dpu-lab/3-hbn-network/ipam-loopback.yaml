@@ -1,15 +1,14 @@
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceIPAM
 metadata:
-  name: tenant-a-host
+  name: lab-loopback
   namespace: dpf-operator-system
   annotations:
     argocd.argoproj.io/sync-wave: '80'
 spec:
   dpuClusterSelector:
     matchLabels:
-      training.dpf.nvidia.com/tenant: tenant-a
+      training.dpf.nvidia.com/tenant: lab
   ipv4Network:
-    gatewayIndex: 2
-    network: 10.60.10.0/29
-    prefixSize: 29
+    network: 10.60.124.34/32  # please change here: DPU loopback; the switch prefix list must permit it
+    prefixSize: 32

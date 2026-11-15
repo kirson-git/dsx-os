@@ -1,7 +1,7 @@
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUDeployment
 metadata:
-  name: hbn-tenant-a
+  name: hbn-lab
   namespace: dpf-operator-system
   annotations:
     argocd.argoproj.io/sync-wave: '92'
@@ -12,18 +12,18 @@ spec:
       type: OnDelete
     dpuSets:
     - dpuClusterSelector:
-        training.dpf.nvidia.com/tenant: tenant-a
+        training.dpf.nvidia.com/tenant: lab
       dpuDeviceSelector:
         matchLabels:
-          provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.0.2.149
-          provisioning.dpu.nvidia.com/dpunode-name: dpu-node-tenant-a
+          provisioning.dpu.nvidia.com/dpudevice-bmc-ip: 192.0.2.246
+          provisioning.dpu.nvidia.com/dpunode-name: dpu-node-lab
       dpuNodeSelector:
         matchLabels:
           feature.node.kubernetes.io/dpu-enabled: 'true'
           training.dpf.nvidia.com/selected: 'true'
-          training.dpf.nvidia.com/tenant: tenant-a
-      nameSuffix: tenant-a
-    flavor: hbn-tenant-a-v26.4.0
+          training.dpf.nvidia.com/tenant: lab
+      nameSuffix: lab
+    flavor: hbn-lab-v26.4.0
     nodeEffect:
       force: false
       hold: true
@@ -58,5 +58,5 @@ spec:
       applyNodeEffect: true
   services:
     doca-hbn:
-      serviceConfiguration: doca-hbn-tenant-a
-      serviceTemplate: doca-hbn-tenant-a
+      serviceConfiguration: doca-hbn-lab
+      serviceTemplate: doca-hbn-lab

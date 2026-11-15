@@ -1,7 +1,7 @@
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceTemplate
 metadata:
-  name: doca-hbn-tenant-a
+  name: doca-hbn-lab
   namespace: dpf-operator-system
   annotations:
     argocd.argoproj.io/sync-wave: '80'

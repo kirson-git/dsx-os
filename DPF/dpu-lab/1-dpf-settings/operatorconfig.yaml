@@ -16,7 +16,7 @@ spec:
     highSpeedMTU: 1500
   overrides:
     kubernetesAPIServerPort: 6443
-    kubernetesAPIServerVIP: 192.0.2.20
+    kubernetesAPIServerVIP: 198.51.100.20  # please change here: address of the existing management Kubernetes API
     argoCDNamespace: dpf-operator-system
   provisioningController:
     dmsTimeout: 900

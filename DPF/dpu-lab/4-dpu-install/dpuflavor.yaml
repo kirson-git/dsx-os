@@ -1,7 +1,7 @@
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUFlavor
 metadata:
-  name: hbn-tenant-a-v26.4.0
+  name: hbn-lab-v26.4.0
   namespace: dpf-operator-system
   annotations:
     argocd.argoproj.io/sync-wave: '90'
@@ -29,7 +29,7 @@ spec:
     permissions: '0644'
     raw: ''
   - operation: override
-    path: /etc/netplan/60-tenant-a-dns.yaml
+    path: /etc/netplan/60-lab-dns.yaml
     permissions: '0600'
     raw: |
       network:
@@ -37,7 +37,7 @@ spec:
         ethernets:
           oob_net0:
             nameservers:
-              addresses: [192.0.2.53]
+              addresses: [203.0.113.53, 203.0.113.54, 203.0.113.55]  # please change here: DNS reachable from the DPU
   - operation: override
     path: /etc/systemd/system/dpu-agent.service.d/10-time-sync.conf
     permissions: '0644'
