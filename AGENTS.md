@@ -6,14 +6,17 @@
   customer-facing site YAML; mark editable values `# please change here`.
 - Prefill verified lab values when requested. Explain DHCP versus manual IPs,
   where DHCP runs, and whether this package installs it. Never guess addresses.
-- Describe actual scope: `DPF/config.yaml` configures the operator and tenants
-  after platform installation; optional DHCP uses the same file. HBN and
-  provisioning remain separate stages.
+- **Customer goals (the two parts of `DPF/README.md`):** (1) the installer
+  `DPF/dpf-install.sh` installs DPF and its prerequisites; (2) from scratch,
+  after DPF is installed, `DPF/dpu-lab/` is the step-by-step path. Its YAML
+  files hold the editable values, marked `# please change here`, with examples
+  and references in the comments. HBN and hardware settings are in the numbered
+  folders `3-hbn-network` and `4-dpu-install`.
+- The Argo CD flow (`DPF/argo/`, settings in `DPF/argo/config.yaml`) is the
+  other way. It stays on `main` but is not the default. The combined
+  `install.yaml` installer was removed; do not recreate it. Tags `v1.0` and
+  `v1.2` hold earlier layouts.
 - Keep the README short: numbered steps and a simple diagram; link longer guides.
-- Default to the existing step-by-step workflow with `DPF/config.yaml` as the
-  settings file. Do not redirect users to the combined `install.yaml` or its
-  password wrapper unless they explicitly choose the combined installer.
-  State that HBN/hardware settings remain in separate stage files.
 - Validate YAML rendering, commands, links and Markdown. When publication is
   authorized, commit/push and verify the remote revision before sharing Git links.
 - When the user will run/test the commands, leave deployment to them.
@@ -75,7 +78,7 @@ Read these before any install, teardown or demo work in this repository.
   login once (read-only Redfish GET) before relying on it; stop after one
   failure. When listing a credentials file, mask whole lines, not `key=value`
   patterns: a `user/password` line slipped through such a mask once.
-- **Workbench:** `DPF/user-documentation/dpf-only-workbench-new.html` is the
+- **Workbench:** `DPF/docs/dpf-only-workbench-new.html` is the
   current page (intro + DPU 101 from the user's file, YAML and Edit/Provision/
   Add-a-tenant from the lab). Tenant names are the lab's: `lab` (VRF EUROPE,
   VNI 100001, AS 65101) and `asia` (VRF ASIA, VNI 100002, AS 65201). Check by

@@ -13,7 +13,7 @@ DPF/dpu-lab/tenant-*/
 DPF/dpu-lab/0-bmc-secret/bmc-secret.yaml
 
 # page snapshots for our own review; local only
-DPF/user-documentation/versions/
+DPF/argo/user-documentation/versions/
 
 # real site values (addresses, serial numbers) and the YAML generated from them; local only
 DPF/dpu-lab/site/

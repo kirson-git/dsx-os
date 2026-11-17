@@ -18,7 +18,7 @@ check: each step says what you must see before you continue.
   numbered folders, and this guide. To add a second DPU, see
   [Add one more tenant](#add-one-more-tenant) at the end.
 - Guided walkthrough in a browser:
-  [dpf-only-workbench-new.html](../user-documentation/dpf-only-workbench-new.html).
+  [dpf-only-workbench-new.html](../docs/dpf-only-workbench-new.html).
 - All ten steps were run in a lab on 2026-11-14 and 2026-11-15, and the
   output shown is real, with the addresses and serial numbers replaced by the
   examples. The DPU reached `Ready`, both BGP sessions from HBN to
@@ -579,7 +579,7 @@ down for about 11 seconds. See [CHECKS.md](CHECKS.md).
 
 Use this to go back to "DPF is installed, nothing configured", or further to
 an empty cluster. **These steps were not run in this lab yet.** They follow the
-teardown rules in [RECOVERY.md](../docs/RECOVERY.md): remove the objects in the
+teardown rules in [RECOVERY.md](../argo/docs/RECOVERY.md): remove the objects in the
 reverse order of the install, and wait after each step so DPF can clean up.
 Only a server dry-run of the delete commands was done.
 

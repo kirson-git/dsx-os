@@ -32,7 +32,7 @@ def main():
             elif source.get('path')=='helm':
                 cmd=['helm','template','nico',str(up/'helm'),'-n',ns,'--include-crds']
             elif source.get('path')=='deploy/charts/dpf-operator':
-                cmd=['helm','template','dpf-operator',str(REPO/'DPF/charts/dpf-operator-v26.4.0.tgz'),'-n',ns,'--include-crds']
+                cmd=['helm','template','dpf-operator',str(REPO/'DPF/argo/charts/dpf-operator-v26.4.0.tgz'),'-n',ns,'--include-crds']
             elif 'chart' in source:
                 if not a.fetch_charts:
                     print('SKIP remote chart',name);continue

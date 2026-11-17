@@ -11,10 +11,10 @@ One HTML page explains DPU basics, the YAML files and the install steps, with
 the lab's real example values (tenant, VRF, VNI, BGP AS). It is a single file
 with no internet needed.
 
-**[Open `dpf-only-workbench-new.html`](DPF/user-documentation/dpf-only-workbench-new.html)**
+**[Open `dpf-only-workbench-new.html`](DPF/docs/dpf-only-workbench-new.html)**
 on GitHub, click the **Download raw file** button (arrow icon, top right of the
 file view), then double-click the saved file to open it in your browser.
-Or, with the repo cloned: `xdg-open DPF/user-documentation/dpf-only-workbench-new.html`
+Or, with the repo cloned: `xdg-open DPF/docs/dpf-only-workbench-new.html`
 (macOS: `open`).
 
 ## How the pieces fit
@@ -46,7 +46,7 @@ cd DPF
 ./dpf-install.sh --verify                   # every row: Installed, Ready, Match
 ```
 
-Details and a recorded run: [installer guide](DPF/user-documentation/dpf-install-script-run.md).
+Details and a recorded run: [installer guide](DPF/docs/dpf-install-script-run.md).
 
 ## Part 2: from scratch, after DPF is installed: the DPU lab
 
@@ -66,11 +66,11 @@ and keep your edited copies in `DPF/dpu-lab/site/`, which Git ignores.
 
 ## Other ways and references
 
-- **Argo CD flow** (settings in `DPF/config.yaml`, applied as Argo
-  Applications): [DPF/README.md](DPF/README.md). Use it **or** the installer
+- **Argo CD flow** (settings in `DPF/argo/config.yaml`, applied as Argo
+  Applications): [DPF/argo/README.md](DPF/argo/README.md). Use it **or** the installer
   above on a cluster, not both. Each resource has one owner.
-- [Demo commands](DPF/docs/DEMO.txt) · [Credentials](DPF/docs/CREDENTIALS.md) ·
-  [DHCP](DPF/docs/DHCP.md) · [Separate YAML stages](DPF/docs/STAGED-INSTALL.md) ·
-  [Platform/tenant-only config](DPF/docs/PLATFORM-AND-TENANTS.md) ·
+- [Demo commands](DPF/argo/docs/DEMO.txt) · [Credentials](DPF/docs/CREDENTIALS.md) ·
+  [DHCP](DPF/argo/docs/DHCP.md) · [Separate YAML stages](DPF/argo/docs/STAGED-INSTALL.md) ·
+  [Platform/tenant-only config](DPF/argo/docs/PLATFORM-AND-TENANTS.md) ·
   [Agent rules](AGENTS.md)
 - Standalone DPF does not require NICo.

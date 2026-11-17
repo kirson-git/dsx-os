@@ -2,7 +2,7 @@
 
 `dpf-install.sh` checks a cluster, then installs the DPF prerequisites and the
 DPF v26.4.0 operator with Helm. It is an alternative to the Argo CD steps in
-the [main guide](../README.md). Use one of the two on a cluster, not both:
+the [Argo guide](../argo/README.md). Use one of the two on a cluster, not both:
 they install the same components.
 
 Needs Bash, kubectl, Helm and Python 3 with PyYAML. Installing also needs
@@ -63,7 +63,7 @@ Run every command from the `DPF/` folder.
 
 The installer stops at the operator. The tenant cluster, HBN and DPU
 provisioning use the YAML files under
-[`profiles/two-tenant-hbn/desired/`](../profiles/two-tenant-hbn/README.md).
+[`profiles/two-tenant-hbn/desired/`](../argo/profiles/two-tenant-hbn/README.md).
 Replace the example addresses and hardware identities there before applying
 them.
 

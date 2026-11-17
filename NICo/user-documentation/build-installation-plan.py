@@ -131,7 +131,7 @@ overrides:
 # Configure its reserved VIP, interface and CP-node selector.'''),
 p('These excerpts show fields, not a complete resource to apply. Reserve the tenant control-plane VIP outside DHCP and independent automatic allocation. NICo owns discovery; do not enable the standalone detector/inventory workflow alongside it.'),
 h('Do not run the existing all-stack entry point here'),
-p('NICo/config.yaml and NICo/deploy.sh currently represent the broader Argo-owned stack. DPF/generated/applications/00-platform.yaml also installs shared prerequisites. Neither is a ready DPF-only entry point for this hybrid plan. Its exact apply command must be added after separating and testing ownership.'),
+p('NICo/config.yaml and NICo/deploy.sh currently represent the broader Argo-owned stack. DPF/argo/generated/applications/00-platform.yaml also installs shared prerequisites. Neither is a ready DPF-only entry point for this hybrid plan. Its exact apply command must be added after separating and testing ownership.'),
 code(r'''# Read-only checks after the DPF-only Application is implemented:
 kubectl -n argocd get applications
 kubectl -n dpf-operator-system get pods
@@ -238,7 +238,7 @@ p('<link href="https://docs.nvidia.com/infra-controller/documentation/getting-st
 p('<link href="https://github.com/dsx-ai-factory/infra-controller/tree/80d131a5cd3280f9cef3131fa0c5647bdf3e79d0/helm-prereqs" color="#2475aa">Pinned NVIDIA helm-prereqs source</link> - setup.sh, Helmfile and configuration contracts used here.'),
 p('<link href="https://networking-docs.nvidia.com/dpf/26.4.0/hbn-in-dpf-zero-trust" color="#2475aa">NVIDIA DPF 26.4 HBN in Zero Trust</link> - DPF deployment reference; do not mix its standalone resources with NICo ownership.'),
 p('<link href="https://docs.nvidia.com/networking/display/mftv426131lts/mlxprivhost---nic-configuration-by-the-host-restriction-tool-%28zero-trust-mode%29" color="#2475aa">NVIDIA mlxprivhost reference</link> - read-only host restriction queries.'),
-p('<link href="https://github.com/kirson-git/dsx-os/blob/main/DPF/README.md" color="#2475aa">Existing standalone DPF installation</link> and <link href="https://github.com/kirson-git/dsx-os/blob/main/DPF/user-documentation/DPF-HBN-two-tenant-demo.pdf" color="#2475aa">Europe/Asia demo PDF</link> - separate workflow, not the hybrid installation above.'),
+p('<link href="https://github.com/kirson-git/dsx-os/blob/main/DPF/README.md" color="#2475aa">Existing standalone DPF installation</link> and <link href="https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/user-documentation/DPF-HBN-two-tenant-demo.pdf" color="#2475aa">Europe/Asia demo PDF</link> - separate workflow, not the hybrid installation above.'),
 p('No cluster changes or hardware reboots were performed while preparing this document. No passwords, private keys or hardware MAC addresses are included.')])
 
 W,H=A4;M=40;WIDTH=W-2*M

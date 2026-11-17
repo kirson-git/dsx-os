@@ -1,0 +1,246 @@
+Install DPF step by step
+
+Download config.yaml (https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/config.yaml), edit your settings, then apply each stage.
+Our populated lab copy is /tmp/dpf-lab/config.yaml.
+
+How DPF brings a DPU online
+
+Management Kubernetes (3 nodes)
+  │
+  └─ External Argo CD → prerequisites + DPF                 [Step 3]
+       │
+       ├─ Create Europe + Asia tenant control planes        [Step 4]
+       │    config.yaml → DPUCluster (no DPU workers yet)
+       │
+       ├─ Store BMC credentials; prepare HBN definitions    [Steps 5–6]
+       │
+       └─ Register hardware and request provisioning       [Step 7]
+            DPUDevice + DPUNode: BMC IP, serial, credentials
+            │
+            ▼
+          DPF installs the selected BFB + DPUFlavor
+          DPU OS + bundled DOCA software / firmware settings
+            │
+            ▼
+          Required reboot → DPU joins its selected tenant
+            │
+            ├─ Europe DPU → HBN containers → Europe network
+            └─ Asia DPU   → HBN containers → Asia network
+
+Create the tenant control planes first; DPUs join after provisioning.
+Registering hardware lets DPF identify it; registration alone does not install it.
+The selected BFB supplies the DPU OS and its bundled software. Firmware updates
+depend on the bundle and provisioning settings; installing DPF alone does not
+upgrade every firmware component. HBN runs as containers after the DPU joins.
+Step 6 only prepares its definitions. This flow installs the DPU OS, not the
+server's Ubuntu OS.
+
+See NVIDIA's provisioning flow (https://networking-docs.nvidia.com/dpf/26.4.0/component-description#provisioning-user-flows) and
+DPUDeployment reference (https://networking-docs.nvidia.com/dpf/26.4.0/dpudeployment).
+
+
+Requires working Kubernetes, kubectl, Helm, curl and Bash. No Git clone is needed.
+Keep the existing lab DHCP,
+Ubuntu hosts and switch/router configuration. This guide does not install them.
+Use one ownership model: do not run these stages alongside the older
+dpf-operator-config / dpf-tenants Applications.
+
+Step 1 — Prepare your local settings directory
+
+install -d -m 700 /tmp/dpf-lab /tmp/dpf-lab/scripts
+kubectl get nodes
+
+Expected: management nodes Ready. Run these commands from any directory.
+Public files use raw GitHub URLs; files you edit stay local.
+
+Step 2 — Install external Argo CD
+
+For a new installation:
+
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update argo
+helm install external-argo-cd argo/argo-cd \
+  --version 9.4.1 --namespace argocd --create-namespace \
+  --set configs.cm.installationID=dsx-platform \
+  -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/values/external-argo.yaml \
+  --wait --timeout 10m
+kubectl -n argocd get pods
+
+Already installed? Skip installation; use the
+existing-release update (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
+if its CRD readiness settings have not been applied.
+
+Step 3 — Install prerequisites and DPF
+
+Includes Local Path storage, cert-manager, Kamaji, NFD, Maintenance Operator,
+DPF and DPF's separate service Argo. To reuse existing storage, follow the
+storage setting (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/STAGED-INSTALL.md#2-choose-storage) first.
+
+kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/generated/applications/00-platform.yaml
+kubectl -n argocd patch application dpf-platform --type merge \
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-platform \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+
+Wait for Succeeded, Synced, Healthy. Ctrl+C stops watching only.
+If sync fails, stop and read its message before the next step.
+
+Step 4 — Edit your settings file and create tenants
+
+Our lab: edit the existing file. It already contains the lab settings.
+
+vi /tmp/dpf-lab/config.yaml
+
+New customer: download the public template once, then edit it:
+
+install -d -m 700 /tmp/dpf-lab
+test -e /tmp/dpf-lab/config.yaml || \
+  curl -fsSL https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/config.yaml \
+    -o /tmp/dpf-lab/config.yaml
+vi /tmp/dpf-lab/config.yaml
+
+Edit spec.source.helm.valuesObject — these are the variables Argo passes to Helm:
+
+| Variable | Lab value |
+| --- | --- |
+| apiServerIP | 192.0.2.20 — existing Kubernetes API |
+| vipInterface | enp7s0 — tenant VIP interface |
+| europeVIP | 192.168.0.200 — reserved manually |
+| asiaVIP | 192.168.0.203 — reserved manually |
+| install-dhcp | "no" — retain existing DHCP |
+
+Existing DHCP runs on mgmt-host, server IP 192.168.0.129; it supplies DPU OS
+addresses .244 / .242. Tenant VIPs are not DHCP allocations.
+DHCP settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/DHCP.md) explain the optional Kubernetes DHCP installation.
+
+kubectl apply -f /tmp/dpf-lab/config.yaml
+kubectl -n argocd get application dpf-site -w
+
+Sync starts automatically. Wait for Synced, then Ctrl+C and check:
+
+kubectl -n argocd get application dpf-site -o jsonpath='{.status.operationState.phase}{"\n"}'
+kubectl get dpuclusters -A
+
+Expected: Succeeded, Europe and Asia tenant clusters Ready.
+This completes DPF configuration and tenant creation.
+
+Step 5 — Set the DPU BMC password
+
+Use a private file containing two literal lines (no quotes):
+
+username=root
+password=YOUR_BMC_PASSWORD
+
+Our saved lab file is /tmp/dpf-lab/private/bmc-credentials (mode 600).
+For another site, create your own file outside Git and change the IPs/path below.
+Requires Python 3 and permission to create/exec/delete a helper pod.
+
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/credentials.sh \
+  -o "$HOME/.local/bin/dpf-credentials" && \
+bash "$HOME/.local/bin/dpf-credentials" \
+  --ip 192.168.0.246,192.168.0.249 \
+  --bmc-pass /tmp/dpf-lab/private/bmc-credentials \
+  --node mgmt-node-01 --insecure-bmc
+kubectl -n dpf-operator-system get secret bmc-shared-password
+
+--ip means DPU BMC addresses. The helper tests every login from Kubernetes
+before saving the Secret; any failed check leaves it unchanged. No password prompt.
+--node selects a management node with network access. --insecure-bmc is for
+our self-signed lab; omit it to verify BMC TLS certificates.
+Optional DPU OS SSH checks use --dpu-ip, --dpu-pass and --ssh-known-hosts;
+see credential-file examples (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/CREDENTIALS.md). SSH is not required before BFB
+installation. iDRAC credentials are separate.
+
+Step 6 — Prepare HBN definitions
+
+config.yaml covers DPF/tenant/DHCP settings. HBN and hardware have separate
+stage files. Public HBN Application (raw) (https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/generated/applications/30-hbn.yaml).
+For our lab, use the reviewed local overrides below; the public example does
+not contain them:
+
+kubectl apply -f /tmp/dpf-lab/30-hbn-application.yaml
+kubectl -n argocd patch application dpf-hbn --type merge \
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-hbn \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+
+Wait for Succeeded / Synced, then Ctrl+C. HBN pods run after DPU provisioning.
+For a new site, prepare the HBN and hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/CONFIGURATION.md) first;
+these private lab files are not available from a public raw URL.
+
+Step 7 — Register and provision DPUs, then check status
+
+Public provisioning Application (raw) (https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/generated/applications/40-provisioning.yaml). Our lab uses the local
+file below with its hardware settings; do not replace it with the public example.
+
+Can reimage DPUs. Our staged profile retains nodeEffect.hold: true and
+external reboot handling. It can pause for manual maintenance/reboot; applying
+this file alone does not guarantee a completed reinstall.
+
+kubectl apply -f /tmp/dpf-lab/40-provisioning-application.yaml
+kubectl -n argocd patch application dpf-provisioning --type merge \
+  -p '{"operation":{"retry":{"limit":5,"backoff":{"duration":"10s","factor":2,"maxDuration":"3m"}},"sync":{"prune":false,"syncOptions":["ServerSideApply=true","ClientSideApplyMigration=false","FailOnSharedResource=true"],"syncStrategy":{"hook":{}}}}}'
+kubectl -n argocd get application dpf-provisioning \
+  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
+
+Succeeded / Synced means manifests were applied. Ctrl+C, then check hardware:
+
+kubectl -n dpf-operator-system get dpus -w
+
+If a DPU pauses, inspect its conditions before releasing holds or rebooting:
+
+kubectl -n dpf-operator-system describe dpus
+
+Both DPUs must reach Ready. Then use the demo checks (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/DEMO.txt) for HBN,
+Ubuntu Internet access and tenant isolation. The host addresses remain
+Europe 10.0.0.2/24 and Asia 10.0.0.1/24 in the existing lab.
+
+Monitor installation in tmux
+
+Requires tmux (sudo apt-get install tmux on Ubuntu).
+
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/argo/scripts/monitor.sh \
+  -o "$HOME/.local/bin/dpf-monitor" && bash "$HOME/.local/bin/dpf-monitor"
+
+Four visible panes show DPU/BFB status, provisioning logs, service controller
+logs, and events. These are Kubernetes/controller logs; DPU OS consoles and
+HBN container logs inside tenant clusters are not included. The monitor is read
+only and stays running after you detach.
+
+- Select pane: Ctrl+b, then an arrow. Zoom/unzoom: Ctrl+b, then z.
+- Detach: Ctrl+b, then d. Reopen: tmux attach -t dpf-monitor.
+- Controller logs and events are saved under $HOME/dpf-logs/TIMESTAMP/.
+  Override with --log-dir /your/directory. Reconnection may repeat recent lines.
+- Stop monitoring/log collection: tmux kill-session -t dpf-monitor.
+
+Run bash "$HOME/.local/bin/dpf-monitor" --help for options. Re-running attaches
+to the existing session and converts old monitor windows into the split view.
+New log settings require a different session name. No split-screen flag is needed.
+
+Public stage templates (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/STAGED-INSTALL.md) · Hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/CONFIGURATION.md) ·
+Production settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/PRODUCTION.md) · Deletion and recovery (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/docs/RECOVERY.md)
+
+LIVE DEMO — existing nico-lab helpers only
+
+kubectl -n argocd get applications
+kubectl get dpuclusters -A
+kubectl -n dpf-operator-system get dpus
+python3 /tmp/dpf-lab/tenant-run.py europe -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn
+python3 /tmp/dpf-lab/tenant-run.py asia -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn
+
+Internet through HBN: expect Cisco ping replies and HTTP=200.
+python3 /tmp/dpf-lab/host-run.py europe /tmp/dpf-lab/check-host-network.sh
+python3 /tmp/dpf-lab/host-run.py asia /tmp/dpf-lab/check-host-network.sh
+
+Data-network isolation: expect cross-tenant ping/SSH blocked and PASS.
+python3 /tmp/dpf-lab/host-run.py europe /tmp/dpf-lab/check-isolation-europe.sh
+python3 /tmp/dpf-lab/host-run.py asia /tmp/dpf-lab/check-isolation-asia.sh
+
+Saved Zero Trust proof (2026-10-17, not live): expect RESTRICTED.
+cat /tmp/dpf-lab/demo-check-20261017T171259Z/europe-zero-trust.log
+cat /tmp/dpf-lab/demo-check-20261017T171259Z/asia-zero-trust.log
+
+HELPER EXPIRED? Recreate it before host checks:
+kubectl -n dpf-operator-system delete pod dpf-hbn-recovery-access --ignore-not-found --wait=true --timeout=60s
+kubectl apply -f /tmp/dpf-lab/access-pod.yaml
+kubectl -n dpf-operator-system wait pod/dpf-hbn-recovery-access --for=condition=Ready --timeout=120s

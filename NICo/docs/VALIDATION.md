@@ -39,7 +39,7 @@ They are not cluster integration tests.
 | `charts/prerequisites` | Pinned NICo `helm-prereqs` chart, Apache-2.0; included LICENSE |
 | `manifests/vault-tls` | Rendered bootstrap subset of that pinned prerequisite chart |
 | `values/*.yaml` | Pinned NICo operator values, with the overrides described below |
-| `charts/kamaji` | Kamaji 1.2.0 rendered from `DPF/charts/kamaji-1.2.0.tgz`, using existing DPF Argo adapter logic |
+| `charts/kamaji` | Kamaji 1.2.0 rendered from `DPF/argo/charts/kamaji-1.2.0.tgz`, using existing DPF Argo adapter logic |
 | `charts/storage` | Rancher local-path-provisioner 0.0.34 chart from the lab prerequisite source |
 | Core chart and monitoring CRDs | Fetched from the pinned upstream NICo commit at sync time |
 
@@ -91,6 +91,6 @@ Europe/Asia environment was not migrated as part of creating this package.
 Vendored source archive SHA-256 values:
 
 ```text
-43ab7711f8ea49dd3a9b3b587585dd1769b5cc5591232d91f940b4a02be3322a  DPF/charts/kamaji-1.2.0.tgz
-0f9a18a0d64958e2f1769bdb468a46ad65e0ea485dadb86cad9e6457b3cec69a  DPF/charts/dpf-operator-v26.4.0.tgz
+43ab7711f8ea49dd3a9b3b587585dd1769b5cc5591232d91f940b4a02be3322a  DPF/argo/charts/kamaji-1.2.0.tgz
+0f9a18a0d64958e2f1769bdb468a46ad65e0ea485dadb86cad9e6457b3cec69a  DPF/argo/charts/dpf-operator-v26.4.0.tgz
 ```
