@@ -42,6 +42,9 @@ Examples:
 Options:
   --delete-storage      With --clean only: also delete lab PVCs and bound PVs.
                         Storage provisioner and StorageClasses remain installed.
+  --force-finalizers    With --clean only: also release objects that are stuck in
+                        deletion (already marked for deletion, held by a finalizer).
+                        Use only when what they wait for is already gone.
   --yes                 With --clean only: execute the displayed cleanup scope.
   --more                With --verify/--diagnose/--clean: show detailed information.
   --context NAME        Target kubeconfig context (default: current context).
@@ -72,7 +75,7 @@ EOF
 
 if (( $# == 0 )); then usage; exit 0; fi
 
-action=false dpf=false bmc=false discover=false status=false menu=false diagnose=false clean=false delete_storage=false yes=false more=false dry=false context='' storage=local-path seconds=600
+action=false dpf=false bmc=false discover=false status=false menu=false diagnose=false clean=false delete_storage=false force_finalizers=false yes=false more=false dry=false context='' storage=local-path seconds=600
 while [[ $# -gt 0 ]]; do
     case $1 in
         --install-prereq) action=true; shift ;;
@@ -84,6 +87,7 @@ while [[ $# -gt 0 ]]; do
         --diagnose) diagnose=true; shift ;;
         --clean) clean=true; shift ;;
         --delete-storage) delete_storage=true; shift ;;
+        --force-finalizers) force_finalizers=true; shift ;;
         --yes) yes=true; shift ;;
         --more) more=true; shift ;;
         --dry-run) dry=true; shift ;;
@@ -103,7 +107,7 @@ actions=0
 for selected in "$action" "$status" "$menu" "$diagnose" "$clean" "$dpf" "$bmc" "$discover"; do
     if [[ "$selected" == true ]]; then actions=$((actions + 1)); fi
 done
-if (( actions > 1 )) || [[ "$action" == false && "$dpf" == false && "$dry" == true ]] || [[ ( "$yes" == true || "$delete_storage" == true ) && "$clean" == false ]]; then
+if (( actions > 1 )) || [[ "$action" == false && "$dpf" == false && "$dry" == true ]] || [[ ( "$yes" == true || "$delete_storage" == true || "$force_finalizers" == true ) && "$clean" == false ]]; then
     usage >&2; exit 2
 fi
 if [[ "$more" == true && ( "$action" == true || "$dpf" == true || "$bmc" == true || "$discover" == true || "$menu" == true ) ]]; then
@@ -137,6 +141,7 @@ if [[ "$clean" == true ]]; then
     extra=()
     if [[ "$yes" == true ]]; then extra+=(--yes); fi
     if [[ "$delete_storage" == true ]]; then extra+=(--delete-storage); fi
+    if [[ "$force_finalizers" == true ]]; then extra+=(--force-finalizers); fi
     if [[ "$more" == true ]]; then extra+=(--more); fi
     exec bash "$base/modules/uninstall.sh" --context "$context" --timeout "$seconds" "${extra[@]}"
 fi

@@ -83,7 +83,7 @@ def orphans(context):
     return [identity(o,o['kind'].lower()) for o in items]
 
 
-def inventory(context,delete_storage=False):
+def inventory(context,delete_storage=False,force_finalizers=False):
     k=['kubectl',f'--context={context}','--request-timeout=30s']
     all_releases=read_json(['helm','--kube-context',context,'list','-A',*LIST_FLAGS,'--max','10000','-o','json'])
     releases=targets(all_releases)
@@ -91,7 +91,7 @@ def inventory(context,delete_storage=False):
     foreign=[r for r in all_releases if r['namespace'] in NAMESPACES and (r['name'],r['namespace']) not in known and r['status']!='uninstalled']
     if foreign:raise RuntimeError('Unrelated Helm release in a lab namespace: '+foreign[0]['name']+'. Move/review it before resetting that namespace.')
     definitions=[o for o in read_json([*k,'get','crds','-o','json'])['items'] if scoped_group(o['spec']['group'])]
-    custom=[]
+    custom=[];stuck=[]
     for crd in definitions:
         resource=crd['metadata']['name']
         instances=read_json([*k,'get',resource,'-A','-o','json'])['items']
@@ -99,6 +99,14 @@ def inventory(context,delete_storage=False):
             namespace=obj['metadata'].get('namespace','')
             if namespace and namespace not in NAMESPACES:
                 raise RuntimeError(f'{resource} is used outside this lab ({namespace}). Shared CRDs cannot be removed.')
+            # A stuck object: already marked for deletion, held only by a finalizer whose
+            # controller can no longer finish (e.g. its DPU cluster is gone). Opt-in only.
+            if obj['metadata'].get('deletionTimestamp') and obj['metadata'].get('finalizers'):
+                if force_finalizers:
+                    record=identity(obj,resource);record['finalizers']=obj['metadata']['finalizers']
+                    stuck.append(record);continue
+                raise RuntimeError(f'{resource}/{obj["metadata"]["name"]} is stuck in deletion (finalizers: '
+                                   +', '.join(obj['metadata']['finalizers'])+'). If what it waits for is already gone, rerun with --force-finalizers.')
             if resource in HARDWARE:
                 raise RuntimeError(f'Deprovision {resource}/{obj["metadata"]["name"]} first, while its controller is running.')
             # Shared cluster-scoped prerequisites need ownership evidence.
@@ -130,7 +138,7 @@ def inventory(context,delete_storage=False):
             record['reclaimPolicy']=obj['spec'].get('persistentVolumeReclaimPolicy','Unknown')
             pvs.append(record)
     plan={'context':context,'releases':releases,'crds':[identity(o,'customresourcedefinitions') for o in definitions],
-          'custom':custom,'configs':configs,'orphans':orphans(context),'pvcs':claims,'pvs':pvs,'delete_storage':delete_storage}
+          'custom':custom,'stuck':stuck,'configs':configs,'orphans':orphans(context),'pvcs':claims,'pvs':pvs,'delete_storage':delete_storage}
     check_volume_retention(context,plan)
     return plan
 
@@ -164,7 +172,7 @@ def show(plan,more=False):
     if plan['releases']:
         table([[r['name'],r['status'].capitalize(),'Remove'] for r in plan['releases']],['COMPONENT','STATUS','ACTION'])
         print()
-    rows=[['Custom resources',len(plan['custom']),'Delete'],['DPF / prerequisite CRDs',len(plan['crds']),'Delete'],
+    rows=[['Stuck in deletion',len(plan['stuck']),'Remove finalizers'],['Custom resources',len(plan['custom']),'Delete'],['DPF / prerequisite CRDs',len(plan['crds']),'Delete'],
           ['Orphaned Helm RBAC/webhooks',len(plan['orphans']),'Delete'],
           ['Secrets',sum(o['resource']=='secrets' for o in plan['configs']),'Delete'],
           ['ConfigMaps',sum(o['resource']=='configmaps' for o in plan['configs']),'Delete'],
@@ -177,10 +185,11 @@ def show(plan,more=False):
         outcome('warn','Storage deletion selected. Backend data removal follows the PV reclaim policy.')
     if more:
         print('\nExact resource scope:')
-        objects=plan['custom']+plan['crds']+plan['orphans']+plan['configs']+plan['pvcs']+plan['pvs']
+        objects=plan['stuck']+plan['custom']+plan['crds']+plan['orphans']+plan['configs']+plan['pvcs']+plan['pvs']
         table([[o['resource'],o['namespace'] or '-',o['name']] for o in objects],['KIND','NAMESPACE','NAME'])
         if plan['pvs']:table([[o['name'],o['reclaimPolicy']] for o in plan['pvs']],['PV','RECLAIM POLICY'])
-        print('\nRuntime objects are deleted before their controllers. No force/finalizer bypass or hardware reset.')
+        print('\nRuntime objects are deleted before their controllers. No hardware reset.')
+        print('Finalizers are removed only with --force-finalizers, and only from objects already marked for deletion.')
 
 
 def execute_command(command,log,seconds):
@@ -213,15 +222,29 @@ def delete_objects(k,objects,seconds,log):
         execute_command([*args,'delete',obj['resource'],obj['name'],'--ignore-not-found','--wait=true','--timeout',f'{seconds}s'],log,seconds)
 
 
+def release_stuck(k,objects,log):
+    for obj in objects:
+        args=[*k]
+        if obj['namespace']:args+=['-n',obj['namespace']]
+        text=read_text([*args,'get',obj['resource'],obj['name'],'--ignore-not-found','-o','json'])
+        if not text.strip():continue
+        live=json.loads(text)
+        # Only the same object, and only while it is still marked for deletion.
+        if live['metadata'].get('uid') != obj['uid'] or not live['metadata'].get('deletionTimestamp'):
+            raise RuntimeError('Resource changed since preview; rerun cleanup: '+obj['name'])
+        print(f'  Removing finalizers from {obj["resource"]}/{obj["name"]}...',flush=True)
+        execute_command([*args,'patch',obj['resource'],obj['name'],'--type=merge','-p','{"metadata":{"finalizers":null}}'],log,60)
+
+
 def uninstall(context,release,seconds,log):
     execute_command(['helm','--kube-context',context,'uninstall',release['name'],'-n',release['namespace'],
                      '--wait','--timeout',f'{seconds}s','--no-hooks'],log,seconds)
 
 
-def run(context,execute,seconds,more=False,delete_storage=False):
+def run(context,execute,seconds,more=False,delete_storage=False,force_finalizers=False):
     if not context:context=read_text(['kubectl','config','current-context']).strip()
     if not context:raise RuntimeError('No Kubernetes context selected')
-    plan=inventory(context,delete_storage)
+    plan=inventory(context,delete_storage,force_finalizers)
     show(plan,more)
     if not execute:
         outcome('ready','Preview only. No cluster changes. M: exact resource list.')
@@ -239,6 +262,10 @@ def run(context,execute,seconds,more=False,delete_storage=False):
         if r=='datastores.kamaji.clastix.io':return 40
         if r=='tenantcontrolplanes.kamaji.clastix.io':return 20
         return 10
+    if plan['stuck']:
+        outcome('warn','Removing finalizers from objects stuck in deletion...')
+        release_stuck(k,plan['stuck'],run_dir/'stuck.log')
+        time.sleep(5)
     outcome('info','Removing lab custom resources...')
     delete_objects(k,sorted(plan['custom'],key=priority),seconds,run_dir/'custom-resources.log')
     for index,release in enumerate(plan['releases'],1):
@@ -256,8 +283,8 @@ def run(context,execute,seconds,more=False,delete_storage=False):
     if delete_storage:
         delete_objects(k,plan['pvcs'],seconds,run_dir/'storage.log')
         delete_objects(k,plan['pvs'],seconds,run_dir/'storage.log')
-    remaining=inventory(context,delete_storage)
-    if remaining['releases'] or remaining['crds'] or remaining['configs'] or remaining['custom'] or remaining['orphans'] or (delete_storage and (remaining['pvcs'] or remaining['pvs'])):
+    remaining=inventory(context,delete_storage,force_finalizers)
+    if remaining['releases'] or remaining['crds'] or remaining['configs'] or remaining['custom'] or remaining['stuck'] or remaining['orphans'] or (delete_storage and (remaining['pvcs'] or remaining['pvs'])):
         raise RuntimeError('Some lab objects remain. Inspect --clean --more before retrying.')
     outcome('complete','DPF lab configuration removed. Storage '+('deletion requested.' if delete_storage else 'kept.'))
     print('Next: 3 Install prerequisites, then 9 Install DPF.')
@@ -270,9 +297,10 @@ def main():
     parser.add_argument('--yes',action='store_true')
     parser.add_argument('--delete-storage',action='store_true')
     parser.add_argument('--more',action='store_true')
+    parser.add_argument('--force-finalizers',action='store_true')
     parser.add_argument('--timeout',type=int,default=600)
     args=parser.parse_args()
-    try:return run(args.context,args.yes,args.timeout,args.more,args.delete_storage)
+    try:return run(args.context,args.yes,args.timeout,args.more,args.delete_storage,args.force_finalizers)
     except KeyboardInterrupt:
         outcome('blocked','Cleanup interrupted; rerun the preview to inspect remaining resources.')
         return 130
