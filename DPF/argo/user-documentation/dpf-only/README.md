@@ -1,6 +1,6 @@
 # DPF-only student installation
 
-1. [Read the PDF](DPF-only-installation.pdf) or [copy commands from the text guide](DPF-only-installation.txt).
+1. [Copy the commands from the text guide](DPF-only-installation.txt).
 2. [Download the lab files](DPF-only-lab-files.zip).
 3. Follow the numbered steps: external Argo, prerequisites/DPF, tenants, BMC credentials, HBN, DPU provisioning, Ubuntu SSH and traffic checks.
 

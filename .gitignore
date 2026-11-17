@@ -19,7 +19,20 @@ DPF/argo/user-documentation/versions/
 DPF/dpu-lab/site/
 
 # local agent skill; not part of the repo
-.agents/skills/dsx-dpf-argo/
 
 # demo/video material with real values and passwords; local only
 DPF/internal/
+
+# agent instructions and skills; local only, never part of the customer repo
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
+
+# videos and terminal recordings; local only
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.cast
+*.gif

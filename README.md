@@ -82,6 +82,5 @@ and keep your edited copies in `DPF/dpu-lab/site/`, which Git ignores.
   above on a cluster, not both. Each resource has one owner.
 - [Demo commands](DPF/argo/docs/DEMO.txt) · [Credentials](DPF/docs/CREDENTIALS.md) ·
   [DHCP](DPF/argo/docs/DHCP.md) · [Separate YAML stages](DPF/argo/docs/STAGED-INSTALL.md) ·
-  [Platform/tenant-only config](DPF/argo/docs/PLATFORM-AND-TENANTS.md) ·
-  [Agent rules](AGENTS.md)
+  [Platform/tenant-only config](DPF/argo/docs/PLATFORM-AND-TENANTS.md)
 - Standalone DPF does not require NICo.

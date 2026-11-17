@@ -229,6 +229,6 @@ kubectl -n argocd get applications \
 ```
 
 [Advanced options](INSTALLATION-DETAILS.md) · [Production](PRODUCTION.md)
-· [Deletion and recovery](RECOVERY.md) · [LLM skill](../../../.agents/skills/dsx-dpf-argo/SKILL.md)
+· [Deletion and recovery](RECOVERY.md)
 
 Clean rebuild qualification is in progress; this is not a production certification.

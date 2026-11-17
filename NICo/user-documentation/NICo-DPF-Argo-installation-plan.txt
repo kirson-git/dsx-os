@@ -313,6 +313,6 @@ NVIDIA DPF 26.4 HBN in Zero Trust (https://networking-docs.nvidia.com/dpf/26.4.0
 
 NVIDIA mlxprivhost reference (https://docs.nvidia.com/networking/display/mftv426131lts/mlxprivhost---nic-configuration-by-the-host-restriction-tool-%28zero-trust-mode%29) - read-only host restriction queries.
 
-Existing standalone DPF installation (https://github.com/kirson-git/dsx-os/blob/main/DPF/README.md) and Europe/Asia demo PDF (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/user-documentation/DPF-HBN-two-tenant-demo.pdf) - separate workflow, not the hybrid installation above.
+Existing standalone DPF installation (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/README.md) and Europe/Asia demo commands (https://github.com/kirson-git/dsx-os/blob/main/DPF/argo/user-documentation/DPF-HBN-two-tenant-demo.txt) - separate workflow, not the hybrid installation above.
 
 No cluster changes or hardware reboots were performed while preparing this document. No passwords, private keys or hardware MAC addresses are included.

@@ -36,7 +36,3 @@ an IP subnet range but occupy separate tenant networks.
 HBN pods rolled; no DPU reboot or BFB reinstall was required. Asia's configured
 service-chain maintenance hold required explicit acknowledgement. Aggregate
 HBN status still has the documented DPF 26.4 cluster-counting discrepancy.
-
-For agents, use the repository's
-[DPF Argo skill](../../../../../.agents/skills/dsx-dpf-argo/SKILL.md) and its
-[HBN migration procedure](../../../../../.agents/skills/dsx-dpf-argo/references/hbn-migration.md).
