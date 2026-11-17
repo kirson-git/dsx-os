@@ -1,9 +1,9 @@
 # Platform and tenant configuration details
 
-Follow the [step-by-step DPF guide](README.md). This page explains the settings
+Follow the [step-by-step DPF guide](../README.md). This page explains the settings
 and external Argo maintenance commands in more detail.
 
-**One file to edit: [config.yaml](config.yaml).** It contains the Kubernetes API,
+**One file to edit: [config.yaml](../config.yaml).** It contains the Kubernetes API,
 tenant VIPs, optional DHCP and MAC reservations. Argo reads the templates from
 Git. Passwords stay outside Git; the public file has blank MAC fields.
 
@@ -151,7 +151,7 @@ The public `30-hbn` and `40-provisioning` manifests are **examples**. Before
 syncing them, replace the BMC addresses, serials, node selectors, HBN hostname
 patterns, DNS and IPAM pools with verified site settings. `config.yaml` configures
 the operator and tenant APIs; it does not yet override those hardware settings.
-See the [profile requirements](profiles/two-tenant-hbn/README.md#required-edits).
+See the [profile requirements](../profiles/two-tenant-hbn/README.md#required-edits).
 
 Both stage directories support Argo `spec.source.kustomize.patches` for local
 Application overrides. Remove `spec.source.directory` when using Kustomize.

@@ -12,7 +12,7 @@ when needed. Endpoints are distinct unicast IPv4 addresses; the interface is
 DNS endpoint names are not supported by this chart. Unknown keys fail validation.
 
 `install-dhcp` defaults to the string `"no"`; `"yes"` enables the optional
-[DHCP component](../../DHCP.md). Blank MACs are accepted only while DHCP is off.
+[DHCP component](../../docs/DHCP.md). Blank MACs are accepted only while DHCP is off.
 Pruning and self-healing are disabled. Applying the Application starts sync;
 later Git changes can also trigger sync. No deletion finalizer is added.
 

@@ -131,7 +131,7 @@ The password never goes into a YAML file.
    ```
 
 `--insecure-bmc` is needed because the lab BMC uses a self-signed certificate.
-More options are in [CREDENTIALS.md](../CREDENTIALS.md).
+More options are in [CREDENTIALS.md](../docs/CREDENTIALS.md).
 
 **Other way: the Secret as a YAML file.** Use this if you want every part of
 the install to be a `kubectl apply`. The password is then in a file on disk, so
@@ -579,7 +579,7 @@ down for about 11 seconds. See [CHECKS.md](CHECKS.md).
 
 Use this to go back to "DPF is installed, nothing configured", or further to
 an empty cluster. **These steps were not run in this lab yet.** They follow the
-teardown rules in [RECOVERY.md](../RECOVERY.md): remove the objects in the
+teardown rules in [RECOVERY.md](../docs/RECOVERY.md): remove the objects in the
 reverse order of the install, and wait after each step so DPF can clean up.
 Only a server dry-run of the delete commands was done.
 

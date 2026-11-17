@@ -51,9 +51,6 @@ The helper image is pinned by digest and must be reachable by the cluster.
 - `--check-only`: test credentials without saving a Secret.
 - `--password-file FILE`: legacy password-only format, root account, no newline;
   use instead of `--bmc-pass`. Validation still requires `--ip`.
-- `--skip-check`: advanced compatibility path for `bootstrap-credentials.sh`,
-  which already validates credentials and serials. Requires a credential file;
-  cannot be combined with IPs, SSH options or `--check-only`.
 
 ### Optional DPU OS SSH check
 

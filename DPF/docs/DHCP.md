@@ -1,6 +1,6 @@
 # Optional DHCP in Kubernetes
 
-Edit **the same [config.yaml](config.yaml)** used for DPF. There is no second
+Edit **the same [config.yaml](../config.yaml)** used for DPF. There is no second
 customer configuration file. The chart creates a ConfigMap and one dnsmasq pod
 in `dpf-network-system`. It serves explicit MAC reservations only, with no dynamic
 pool. The pod uses the selected node's network and does not provide DNS service.

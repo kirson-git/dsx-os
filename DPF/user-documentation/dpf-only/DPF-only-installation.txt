@@ -78,7 +78,7 @@ What is installed next?
 
 Step 3 installs Local Path storage, cert-manager, Kamaji/etcd, Node Feature Discovery, Maintenance Operator, DPF and DPF service Argo. This bundle enables Local Path storage. For a cluster that already has storage, use the storage-selection guide before applying it.
 
-Storage selection: https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md#2-choose-storage
+Storage selection: https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/STAGED-INSTALL.md#2-choose-storage
 
 Step 3 | Install prerequisites and DPF
 Define this sync function once in the installation terminal; reuse it for the later stages.

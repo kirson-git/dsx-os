@@ -8,7 +8,7 @@ description: Use when assisting with standalone DPF installation, storage select
 Use this repository's public Git manifests to install prerequisites, DPF and
 reviewed tenant/HBN configuration through external Argo CD. Start with the
 [short guide](../../../DPF/README.md); load the
-[detailed guide](../../../DPF/INSTALLATION-DETAILS.md) only for the relevant phase.
+[detailed guide](../../../DPF/docs/INSTALLATION-DETAILS.md) only for the relevant phase.
 Paths below are relative to the dsx-os repository root.
 
 ## Storage decision
@@ -35,33 +35,22 @@ work=$(mktemp -d)
 python3 DPF/tools/external.py --config DPF/site.yaml --output "$work/generated"
 ```
 
-Review and copy `$work/generated/` to `DPF/generated/` and `$work/install.yaml`
-to `DPF/install.yaml`. Validate and push the intended changes before syncing.
+Review and copy `$work/generated/` to `DPF/generated/`. Validate and push the
+intended changes before syncing.
 Do not claim a local edit changes what Argo reads from Git.
 
 ## Ownership and credentials
 
-- The [Bash menu](../../../DPF/INSTALLER.md) wraps Helm external Argo install,
-  private credential creation, the prepared single Application, status and a
-  scoped full teardown. Use `bash DPF/install.sh --config /path/to/install.yaml`.
-  `all` submits auto-sync asynchronously; it does not prove provisioning passed.
-  `bootstrap-credentials.sh` requires `--config` and validates BMC/iDRAC
-  credentials plus serials through temporary host-network pods before writing
-  permanent Secrets. `--check-only` permits existing staged Applications and
-  writes no permanent Secrets. Follow [PASSWORDS.md](../../../DPF/PASSWORDS.md).
-  BMC TLS verification defaults on; only the self-signed lab uses explicit
-  `--insecure-bmc`. Optional OS SSH needs separate credentials and verified host
-  keys. Do not equate Redfish success with IPMI, IPAM or DHCP validation.
-  `delete-plan` is read only; `delete` needs the exact current context typed.
-  Full deletion includes external Argo only when explicitly requested, as here.
-  Shared consumers or orphaned platform ownership stop deletion. Never remove
-  Kubernetes/Calico CRDs or external host/DHCP/router configuration.
-- For the prepared full lab reinstall, follow
-  [the two-command guide](../../../DPF/TWO-COMMAND-INSTALL.md). The private
-  multi-source `dpf` Application owns the four stages; never combine it with
-  the staged Applications. Its Git revision is pinned and its IPs/HBN patches
-  come from the reviewed private inputs. `config.yaml` alone still covers only
-  operator/tenants/DHCP; do not claim it contains all hardware settings.
+- BMC credentials: `DPF/credentials.sh` validates the BMC login and saves the
+  Secret; see [CREDENTIALS.md](../../../DPF/docs/CREDENTIALS.md). BMC TLS
+  verification defaults on; only the self-signed lab uses explicit
+  `--insecure-bmc`. Do not equate Redfish success with IPMI, IPAM or DHCP
+  validation. Never remove Kubernetes/Calico CRDs or external host/DHCP/router
+  configuration.
+- The combined single-Application installer (`install.sh`, `install.yaml`, the
+  two-command guide) was removed from the package. Do not recreate it or send
+  users there. `config.yaml` alone covers only operator/tenants/DHCP; do not
+  claim it contains all hardware settings.
 - Optional `bootstrap.hosts` uses DPF-native script Jobs for host reboot,
   identity checks and a DPUNode journal to prevent repeated reset requests.
   The combined unattended profile removes maintenance holds but preserves
@@ -75,16 +64,16 @@ Do not claim a local edit changes what Argo reads from Git.
   (`dpf-site`). Customers
   edit only `config.yaml`; its Helm values configure operator/tenants and optional
   DHCP. Do not combine it with `dpf-operator-config` or `dpf-tenants`.
-- Alternatives: the full-stack `DPF/install.yaml` Application **or** the five
-  staged Applications in `DPF/generated/applications/`. Ownership must not overlap.
+- Use the five staged Applications in `DPF/generated/applications/`.
+  Ownership must not overlap.
 - Real lab MACs stay local; public MAC fields remain blank. DHCP defaults to
-  `install-dhcp: "no"`. Before enabling, follow `DPF/DHCP.md`, preserve all existing
+  `install-dhcp: "no"`. Before enabling, follow `DPF/docs/DHCP.md`, preserve all existing
   clients, and transfer the server IP without concurrent responders. Corporate
   DHCP for the management VMs is separate and must remain intact.
 - `operator.enabled: false` omits the renderer's legacy DPFOperatorConfig;
   it still installs the operator chart. The profile supplies configuration.
 - Configure API endpoints, tenant VIPs, BMC IPs/labels, serials, hardware
-  selectors and fabric settings using [CONFIGURATION.md](../../../DPF/CONFIGURATION.md).
+  selectors and fabric settings using [CONFIGURATION.md](../../../DPF/docs/CONFIGURATION.md).
   BMC IP is not the DPU's Ubuntu SSH IP.
 - Use `bash DPF/credentials.sh` for the Kubernetes BMC password Secret.
   Passwords, private keys, kubeconfigs and backups stay outside Git.
@@ -100,7 +89,7 @@ phase accurately. Never infer DPU readiness from Argo Synced alone.
 Large CRDs need `ServerSideApply=true`. Argo 3.3.0 supports
 `ClientSideApplyMigration=false` to bypass client-side migration. A kubectl
 operation must carry both sync options and retry policy; direct kubectl patches
-do not copy `spec.syncPolicy.retry`. The [platform/tenant guide](../../../DPF/PLATFORM-AND-TENANTS.md)
+do not copy `spec.syncPolicy.retry`. The [platform/tenant guide](../../../DPF/docs/PLATFORM-AND-TENANTS.md)
 has the complete manual sync command. The main README covers the prepared
 combined Application instead.
 External Argo must load `DPF/values/external-argo.yaml`: its CRD health rule treats
@@ -116,7 +105,7 @@ finalizers, but UI actions can request cascading deletion. A delete can remove
 namespaces and their PVCs. Reclaim policy `Delete` may remove backing data.
 Retained Kamaji etcd PVCs require compatible identities/certificates and an
 explicit restore-versus-rebuild decision; do not blindly attach them to a new
-installation. Follow [RECOVERY.md](../../../DPF/RECOVERY.md).
+installation. Follow [RECOVERY.md](../../../DPF/docs/RECOVERY.md).
 
 Stop retrying when the same error persists; gather the missing evidence and
 report the specific blocker. This skill adds no permission for teardown or
@@ -144,3 +133,13 @@ NICo Core has a separate staged package in `NICo/`; it is not enabled by the
 standalone DPF package. Its clean hardware rollout is not yet qualified.
 A full clean rebuild or
 production qualification must not be claimed from offline tests alone.
+
+## Installer path, teardown and demo runs
+
+The Helm installer path (`DPF/dpf-install.sh`, guide
+`DPF/user-documentation/dpf-install-script-run.md`) and the `DPF/dpu-lab/` files
+are the alternative to Argo CD. The strict teardown order, the `hold: true`
+behaviour, the two-cluster `Pending` display, `--clean --force-finalizers`,
+measured timings and where the real lab values are kept are recorded in
+[AGENTS.md](../../../AGENTS.md), section "Lessons from the lab run of
+2026-11-16". Read that section before any install, delete or demo preparation.

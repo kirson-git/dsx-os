@@ -1,6 +1,6 @@
 # Separate YAMLs: full installation walkthrough
 
-For the settings-file workflow, use [the DPF README](README.md).
+For the settings-file workflow, use [the DPF README](../README.md).
 This manual workflow is an alternative: do not combine its operator/tenant
 Applications with `dpf-site`.
 
@@ -45,7 +45,7 @@ kubectl get storageclass
 kubectl get deployments,pods -A | grep local-path
 ```
 
-Edit [DPF/site.yaml](site.yaml):
+Edit [DPF/site.yaml](../site.yaml):
 
 | Your cluster | `storage.installLocalPath` |
 | --- | --- |
@@ -74,9 +74,8 @@ render_dir=$(mktemp -d)
 /tmp/dsx-render-venv/bin/python DPF/tools/external.py \
   --config DPF/site.yaml --output "$render_dir/generated"
 cp -a "$render_dir/generated/." DPF/generated/
-cp "$render_dir/install.yaml" DPF/install.yaml
-git diff -- DPF/site.yaml DPF/generated DPF/install.yaml
-git add DPF/site.yaml DPF/generated DPF/install.yaml
+git diff -- DPF/site.yaml DPF/generated
+git add DPF/site.yaml DPF/generated
 git commit -m "Configure DPF site and storage"
 git push
 ```
@@ -196,7 +195,7 @@ Wait for **OPERATION = Succeeded and SYNC = Synced**, then press Ctrl+C.
 
 **This stage can reimage DPUs.** Confirm the device identities, BFB/flavor and
 fabric settings. The profile requires external reboot and node-effect handling;
-[review these steps](profiles/two-tenant-hbn/README.md) before syncing.
+[review these steps](../profiles/two-tenant-hbn/README.md) before syncing.
 
 <!-- rumdl-disable MD013 -->
 ```bash
@@ -229,24 +228,7 @@ kubectl -n argocd get applications \
   -o custom-columns=NAME:.metadata.name,PHASE:.status.operationState.phase,MESSAGE:.status.operationState.message
 ```
 
-## Alternative: one YAML for the full stack
-
-For a separate new installation, complete steps 1–2 and configure/push the site
-settings from step 4. Create the namespace before running the password helper:
-
-```bash
-kubectl create namespace dpf-operator-system
-bash DPF/credentials.sh --ip 192.168.0.1,192.168.0.2 \
-  --bmc-pass /secure/private/bmc-credentials
-kubectl apply -f DPF/install.yaml
-kubectl -n argocd get application dpf -w
-```
-
-Skip namespace creation if it already exists. This option automatically syncs
-all stages, including DPU provisioning. **Do not combine it with the five staged
-Applications above.**
-
 [Advanced options](INSTALLATION-DETAILS.md) · [Production](PRODUCTION.md)
-· [Deletion and recovery](RECOVERY.md) · [LLM skill](../.agents/skills/dsx-dpf-argo/SKILL.md)
+· [Deletion and recovery](RECOVERY.md) · [LLM skill](../../.agents/skills/dsx-dpf-argo/SKILL.md)
 
 Clean rebuild qualification is in progress; this is not a production certification.

@@ -9,7 +9,6 @@
 Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
 [Download the two-page SSH and HBN demo PDF](user-documentation/DPF-HBN-two-tenant-demo.pdf)
 ([copyable commands](user-documentation/DPF-HBN-two-tenant-demo.txt)).
-`install.yaml` is the separate combined installer; do not use it for these steps.
 
 ## How DPF brings a DPU online
 
@@ -54,8 +53,8 @@ See NVIDIA's [provisioning flow][nvidia-provisioning] and
 Requires working Kubernetes, kubectl, Helm, curl and Bash. No Git clone is needed.
 Keep the existing lab DHCP,
 Ubuntu hosts and switch/router configuration. This guide does not install them.
-Use one ownership model: do not run these stages alongside the combined `dpf`
-Application or the older `dpf-operator-config` / `dpf-tenants` Applications.
+Use one ownership model: do not run these stages alongside the older
+`dpf-operator-config` / `dpf-tenants` Applications.
 
 ## Step 1 — Prepare your local settings directory
 
@@ -85,14 +84,14 @@ kubectl -n argocd get pods
 <!-- rumdl-enable MD013 -->
 
 Already installed? Skip installation; use the
-[existing-release update](PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
+[existing-release update](docs/PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
 if its CRD readiness settings have not been applied.
 
 ## Step 3 — Install prerequisites and DPF
 
 Includes Local Path storage, cert-manager, Kamaji, NFD, Maintenance Operator,
 DPF and DPF's separate service Argo. To reuse existing storage, follow the
-[storage setting](STAGED-INSTALL.md#2-choose-storage) first.
+[storage setting](docs/STAGED-INSTALL.md#2-choose-storage) first.
 
 <!-- rumdl-disable MD013 -->
 ```bash
@@ -139,7 +138,7 @@ Edit `spec.source.helm.valuesObject` — these are the variables Argo passes to 
 
 Existing DHCP runs on `mgmt-host`, server IP `192.168.0.129`; it supplies DPU OS
 addresses `.244` / `.242`. Tenant VIPs are not DHCP allocations.
-[DHCP settings](DHCP.md) explain the optional Kubernetes DHCP installation.
+[DHCP settings](docs/DHCP.md) explain the optional Kubernetes DHCP installation.
 
 ```bash
 kubectl apply -f /tmp/dpf-lab/config.yaml
@@ -186,7 +185,7 @@ before saving the Secret; any failed check leaves it unchanged. No password prom
 `--node` selects a management node with network access. `--insecure-bmc` is for
 our self-signed lab; omit it to verify BMC TLS certificates.
 Optional DPU OS SSH checks use `--dpu-ip`, `--dpu-pass` and `--ssh-known-hosts`;
-see [credential-file examples](CREDENTIALS.md). SSH is not required before BFB
+see [credential-file examples](docs/CREDENTIALS.md). SSH is not required before BFB
 installation. iDRAC credentials are separate.
 
 ## Step 6 — Prepare HBN definitions
@@ -207,7 +206,7 @@ kubectl -n argocd get application dpf-hbn \
 <!-- rumdl-enable MD013 -->
 
 Wait for `Succeeded` / `Synced`, then Ctrl+C. HBN pods run after DPU provisioning.
-For a new site, prepare the [HBN and hardware settings](CONFIGURATION.md) first;
+For a new site, prepare the [HBN and hardware settings](docs/CONFIGURATION.md) first;
 these private lab files are not available from a public raw URL.
 
 ## Step 7 — Register and provision DPUs, then check status
@@ -241,7 +240,7 @@ If a DPU pauses, inspect its conditions before releasing holds or rebooting:
 kubectl -n dpf-operator-system describe dpus
 ```
 
-Both DPUs must reach `Ready`. Then use the [demo checks](DEMO.txt) for HBN,
+Both DPUs must reach `Ready`. Then use the [demo checks](docs/DEMO.txt) for HBN,
 Ubuntu Internet access and tenant isolation. The host addresses remain
 Europe `10.0.0.2/24` and Asia `10.0.0.1/24` in the existing lab.
 
@@ -251,7 +250,7 @@ Requires `tmux` (`sudo apt-get install tmux` on Ubuntu).
 
 <!-- rumdl-disable MD013 -->
 ```bash
-curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/scripts/monitor.sh \
   -o "$HOME/.local/bin/dpf-monitor" && bash "$HOME/.local/bin/dpf-monitor"
 ```
 <!-- rumdl-enable MD013 -->
@@ -271,8 +270,8 @@ Run `bash "$HOME/.local/bin/dpf-monitor" --help` for options. Re-running attache
 to the existing session and converts old monitor windows into the split view.
 New log settings require a different session name. No split-screen flag is needed.
 
-[Public stage templates](STAGED-INSTALL.md) · [Hardware settings](CONFIGURATION.md) ·
-[Production settings](PRODUCTION.md) · [Deletion and recovery](RECOVERY.md)
+[Public stage templates](docs/STAGED-INSTALL.md) · [Hardware settings](docs/CONFIGURATION.md) ·
+[Production settings](docs/PRODUCTION.md) · [Deletion and recovery](docs/RECOVERY.md)
 
 [raw-config]: https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml
 [raw-hbn]: https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/30-hbn.yaml

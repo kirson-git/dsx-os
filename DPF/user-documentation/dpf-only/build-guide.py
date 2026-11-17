@@ -64,7 +64,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \\
  p('Username: admin. If the initial Secret has been removed, use the existing administrator/SSO credentials. When running remotely, localhost belongs to that remote machine; use your existing tunnel if needed. Do not publish the password.'),
  heading('What is installed next?'),
  p('Step 3 installs Local Path storage, cert-manager, Kamaji/etcd, Node Feature Discovery, Maintenance Operator, DPF and DPF service Argo. This bundle enables Local Path storage. For a cluster that already has storage, use the storage-selection guide before applying it.'),
- p('Storage selection: https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md#2-choose-storage'))
+ p('Storage selection: https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/STAGED-INSTALL.md#2-choose-storage'))
 
 page('Step 3 | Install prerequisites and DPF','Define this sync function once in the installation terminal; reuse it for the later stages.',
  code('''dpf_sync() {

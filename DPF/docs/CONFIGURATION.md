@@ -1,12 +1,12 @@
 # Where to set IPs and passwords
 
-For operator and tenant API settings, edit [config.yaml](config.yaml).
+For operator and tenant API settings, edit [config.yaml](../config.yaml).
 It contains lab IP examples and blank MAC fields; it marks editable values with
 `# please change here`. Apply/sync it using the [platform/tenant guide](PLATFORM-AND-TENANTS.md).
 For DHCP placement and the difference between VIPs and DPU addresses, see
 [where DHCP is needed](PLATFORM-AND-TENANTS.md#where-dhcp-is-needed).
 
-`DPF/install.yaml` selects Git sources and the target cluster. It contains no
+`DPF/site.yaml` selects Git sources and the target cluster. It contains no
 passwords and does not assign DPU IPs itself. The site chart bundles the
 operator/tenant stages from
 `DPF/profiles/two-tenant-hbn/`; it does not deploy hardware stages.

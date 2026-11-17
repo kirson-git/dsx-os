@@ -116,38 +116,9 @@ Commit and push the non-secret YAML changes. Argo reads Git, not local edits.
 If using a fork, update the repository/revision in the chosen Application YAML.
 Private repositories also need [Argo Git access](CREDENTIALS.md).
 
-## Option A: one YAML for the complete stack
+## Separate YAMLs: control of each stage
 
-```bash
-kubectl apply -f DPF/install.yaml
-```
-
-This creates one Application named `dpf`. Automatic sync installs prerequisites,
-DPF, operator configuration, tenant control planes, HBN definitions and the
-provisioning resources. **After you configure real hardware, applying this file
-can initiate BFB installation/reprovisioning.** Prepare fabric and a maintenance
-window first. It does not automatically execute the external reboot method or
-release held node effects.
-
-Argo combines two sources: the rendered platform and the tenant/HBN profile.
-Resource waves order them within the same sync. Readiness Jobs wait for the DPF
-operator configuration reconciliation and tenant APIs; a final gate checks that
-the BMC password Secret is present and nonempty before hardware resources are
-applied. That gate does not test BMC authentication. Failed gates stop later
-waves; fix the cause and retry sync in Argo. Pruning and self-heal are disabled.
-
-The bootstrap gate checks `SystemComponentsReconciled`, not overall `Ready`.
-Overall readiness can depend on services running on provisioned DPUs, so waiting
-for it before provisioning would block a clean installation. Check full readiness
-after the DPUs have joined their tenant clusters.
-
-```bash
-argocd app get dpf
-```
-
-## Option B: separate YAMLs for control of each stage
-
-Apply and sync these in sequence instead of Option A:
+Apply and sync these in sequence:
 
 ```bash
 kubectl apply -f DPF/generated/applications/00-platform.yaml
@@ -218,7 +189,7 @@ in `dpf-operator-system` delivers DPF-generated services to tenant clusters.
 It reuses the external bootstrap's Argo CRDs on this shared cluster and has its
 own installation ID and Application namespace watch scope. Never add generated
 DPF children, runtime kubeconfigs or Secret data to either public profile.
-See [provenance](SOURCES.txt) and the pinned
+See [provenance](../sources/SOURCES.txt) and the pinned
 [NVIDIA prerequisites](https://networking-docs.nvidia.com/dpf/26.4.0/helm-prerequisites).
 
 ## Verify the deployed outcome
@@ -239,9 +210,9 @@ Inspect each tenant's HBN workloads, BGP/EVPN, host gateway/DNS/HTTPS, data sour
 interface and management access. Test both-direction tenant isolation with a
 positive control proving the destination is alive. Argo Synced and a failed ping
 alone do not establish the full outcome. See the
-[profile](profiles/two-tenant-hbn/README.md), [fabric contract](profiles/two-tenant-hbn/FABRIC.md),
+[profile](../profiles/two-tenant-hbn/README.md), [fabric contract](../profiles/two-tenant-hbn/FABRIC.md),
 [production changes](PRODUCTION.md), [recovery](RECOVERY.md) and
-[validation](VALIDATION.md). NICo integration is separate: [NICo/](../NICo/README.md).
+[validation](VALIDATION.md). NICo integration is separate: [NICo/](../../NICo/README.md).
 
 For external Argo on another cluster, set `sameCluster: false`, register the DPF
 cluster privately, set its `destinationName`, and re-render before applying.
@@ -293,13 +264,11 @@ Render into a new directory (nonempty output is rejected to prevent accidental o
 render_dir=$(mktemp -d)
 python3 DPF/tools/external.py --config DPF/site.yaml --output "$render_dir/generated"
 cp -a "$render_dir/generated/." DPF/generated/
-cp "$render_dir/install.yaml" DPF/install.yaml
-git diff -- DPF/site.yaml DPF/generated DPF/install.yaml
+git diff -- DPF/site.yaml DPF/generated
 ```
 
-The renderer also writes `install.yaml` beside the output directory. The commands
-above copy the generated outputs into the checkout. Review the diff, commit
-`DPF/site.yaml`, `DPF/install.yaml` and `DPF/generated/`, and push before syncing.
+The commands above copy the generated outputs into the checkout. Review the
+diff, commit `DPF/site.yaml` and `DPF/generated/`, and push before syncing.
 `DPF/generated/platform/` is the Git
 path used by the example Application. Rendering prints each actual Helm template
 command and does not contact Kubernetes. `tools/render.py` is an internal inherited

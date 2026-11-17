@@ -69,8 +69,8 @@ and keep your edited copies in `DPF/dpu-lab/site/`, which Git ignores.
 - **Argo CD flow** (settings in `DPF/config.yaml`, applied as Argo
   Applications): [DPF/README.md](DPF/README.md). Use it **or** the installer
   above on a cluster, not both. Each resource has one owner.
-- [Demo commands](DPF/DEMO.txt) · [Passwords](DPF/PASSWORDS.md) ·
-  [DHCP](DPF/DHCP.md) · [Separate YAML stages](DPF/STAGED-INSTALL.md) ·
-  [Platform/tenant-only config](DPF/PLATFORM-AND-TENANTS.md) ·
+- [Demo commands](DPF/docs/DEMO.txt) · [Credentials](DPF/docs/CREDENTIALS.md) ·
+  [DHCP](DPF/docs/DHCP.md) · [Separate YAML stages](DPF/docs/STAGED-INSTALL.md) ·
+  [Platform/tenant-only config](DPF/docs/PLATFORM-AND-TENANTS.md) ·
   [Agent rules](AGENTS.md)
 - Standalone DPF does not require NICo.

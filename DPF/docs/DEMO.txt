@@ -2,7 +2,6 @@ Install DPF step by step
 
 Download config.yaml (https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/config.yaml), edit your settings, then apply each stage.
 Our populated lab copy is /tmp/dpf-lab/config.yaml.
-install.yaml is the separate combined installer; do not use it for these steps.
 
 How DPF brings a DPU online
 
@@ -43,8 +42,8 @@ DPUDeployment reference (https://networking-docs.nvidia.com/dpf/26.4.0/dpudeploy
 Requires working Kubernetes, kubectl, Helm, curl and Bash. No Git clone is needed.
 Keep the existing lab DHCP,
 Ubuntu hosts and switch/router configuration. This guide does not install them.
-Use one ownership model: do not run these stages alongside the combined dpf
-Application or the older dpf-operator-config / dpf-tenants Applications.
+Use one ownership model: do not run these stages alongside the older
+dpf-operator-config / dpf-tenants Applications.
 
 Step 1 — Prepare your local settings directory
 
@@ -68,14 +67,14 @@ helm install external-argo-cd argo/argo-cd \
 kubectl -n argocd get pods
 
 Already installed? Skip installation; use the
-existing-release update (https://github.com/kirson-git/dsx-os/blob/main/DPF/PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
+existing-release update (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/PLATFORM-AND-TENANTS.md#existing-argo--apply-the-startup-fix-once)
 if its CRD readiness settings have not been applied.
 
 Step 3 — Install prerequisites and DPF
 
 Includes Local Path storage, cert-manager, Kamaji, NFD, Maintenance Operator,
 DPF and DPF's separate service Argo. To reuse existing storage, follow the
-storage setting (https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md#2-choose-storage) first.
+storage setting (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/STAGED-INSTALL.md#2-choose-storage) first.
 
 kubectl apply -f https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/generated/applications/00-platform.yaml
 kubectl -n argocd patch application dpf-platform --type merge \
@@ -112,7 +111,7 @@ Edit spec.source.helm.valuesObject — these are the variables Argo passes to He
 
 Existing DHCP runs on mgmt-host, server IP 192.168.0.129; it supplies DPU OS
 addresses .244 / .242. Tenant VIPs are not DHCP allocations.
-DHCP settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/DHCP.md) explain the optional Kubernetes DHCP installation.
+DHCP settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/DHCP.md) explain the optional Kubernetes DHCP installation.
 
 kubectl apply -f /tmp/dpf-lab/config.yaml
 kubectl -n argocd get application dpf-site -w
@@ -149,7 +148,7 @@ before saving the Secret; any failed check leaves it unchanged. No password prom
 --node selects a management node with network access. --insecure-bmc is for
 our self-signed lab; omit it to verify BMC TLS certificates.
 Optional DPU OS SSH checks use --dpu-ip, --dpu-pass and --ssh-known-hosts;
-see credential-file examples (https://github.com/kirson-git/dsx-os/blob/main/DPF/CREDENTIALS.md). SSH is not required before BFB
+see credential-file examples (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/CREDENTIALS.md). SSH is not required before BFB
 installation. iDRAC credentials are separate.
 
 Step 6 — Prepare HBN definitions
@@ -166,7 +165,7 @@ kubectl -n argocd get application dpf-hbn \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,OPERATION:.status.operationState.phase -w
 
 Wait for Succeeded / Synced, then Ctrl+C. HBN pods run after DPU provisioning.
-For a new site, prepare the HBN and hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/CONFIGURATION.md) first;
+For a new site, prepare the HBN and hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/CONFIGURATION.md) first;
 these private lab files are not available from a public raw URL.
 
 Step 7 — Register and provision DPUs, then check status
@@ -192,7 +191,7 @@ If a DPU pauses, inspect its conditions before releasing holds or rebooting:
 
 kubectl -n dpf-operator-system describe dpus
 
-Both DPUs must reach Ready. Then use the demo checks (https://github.com/kirson-git/dsx-os/blob/main/DPF/DEMO.txt) for HBN,
+Both DPUs must reach Ready. Then use the demo checks (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/DEMO.txt) for HBN,
 Ubuntu Internet access and tenant isolation. The host addresses remain
 Europe 10.0.0.2/24 and Asia 10.0.0.1/24 in the existing lab.
 
@@ -200,7 +199,7 @@ Monitor installation in tmux
 
 Requires tmux (sudo apt-get install tmux on Ubuntu).
 
-curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/monitor.sh \
+curl -fsSL --create-dirs https://raw.githubusercontent.com/kirson-git/dsx-os/main/DPF/scripts/monitor.sh \
   -o "$HOME/.local/bin/dpf-monitor" && bash "$HOME/.local/bin/dpf-monitor"
 
 Four visible panes show DPU/BFB status, provisioning logs, service controller
@@ -218,8 +217,8 @@ Run bash "$HOME/.local/bin/dpf-monitor" --help for options. Re-running attaches
 to the existing session and converts old monitor windows into the split view.
 New log settings require a different session name. No split-screen flag is needed.
 
-Public stage templates (https://github.com/kirson-git/dsx-os/blob/main/DPF/STAGED-INSTALL.md) · Hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/CONFIGURATION.md) ·
-Production settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/PRODUCTION.md) · Deletion and recovery (https://github.com/kirson-git/dsx-os/blob/main/DPF/RECOVERY.md)
+Public stage templates (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/STAGED-INSTALL.md) · Hardware settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/CONFIGURATION.md) ·
+Production settings (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/PRODUCTION.md) · Deletion and recovery (https://github.com/kirson-git/dsx-os/blob/main/DPF/docs/RECOVERY.md)
 
 LIVE DEMO — existing nico-lab helpers only
 
