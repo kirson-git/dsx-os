@@ -2,10 +2,8 @@
 
 | Directory | Purpose |
 | --- | --- |
-| [DPF](DPF/README.md) | Standalone DPF, prerequisites, two tenants and HBN |
+| [DPF](DPF/README.md) | Standalone DPF: installer, DPU lab, HBN network |
 | [NICo](NICo/README.md) | NICo Core 2.2.2 + DPF; staged GitOps lab-validation profile |
-
-**[Start here: install DPF step by step](DPF/README.md#step-1--get-the-files).**
 
 ## Learn it first: the interactive workbench
 
@@ -24,24 +22,55 @@ Or, with the repo cloned: `xdg-open DPF/user-documentation/dpf-only-workbench-ne
 ```text
 Admin host --kubectl--> Management Kubernetes (3 nodes)
                            |
-  1 Platform     ./dpf-install.sh   cert-manager, Kamaji, Argo CD, DPF operator
-  2 Tenant       DPF/config.yaml    operator settings + DPU cluster
-  3 HBN network  3-hbn-network      VRF + L3 VNI + BGP AS number
-  4 DPU install  4-dpu-install      OS image on the DPU, then host power cycle
+  Part 1  Platform     ./dpf-install.sh   cert-manager, Kamaji, Argo CD, DPF operator
+  Part 2  DPU lab      dpu-lab/           one tenant, four numbered folders:
+          1-dpf-settings    operator settings
+          2-dpu-cluster     the DPU Kubernetes cluster
+          3-hbn-network     VRF + L3 VNI + BGP AS number
+          4-dpu-install     OS image on the DPU, then host power cycle
 
 Server --- DPU (HBN: BGP/EVPN) ---BGP--- Switch --- fabric
 ```
 
-Edit `DPF/config.yaml` for API, tenant VIP and DHCP settings.
-Our populated lab copy is `/tmp/dpf-lab/config.yaml`.
-Install Argo, prerequisites/DPF, tenants, HBN and provisioning as separate steps.
-HBN and hardware overrides live in separate stage files.
-Passwords and real MACs stay outside Git.
+## Part 1: install DPF and its prerequisites with the installer
 
-External Argo is the deployment layer. Each resource has one owner; do not mix
-combined and staged Applications. Standalone DPF does not require NICo.
+Run from the `DPF/` folder. Every install command has a read-only preview.
 
-[Demo commands](DPF/DEMO.txt) · [Passwords](DPF/PASSWORDS.md) ·
-[DHCP](DPF/DHCP.md) · [Separate YAML stages](DPF/STAGED-INSTALL.md) ·
-[Platform/tenant-only config](DPF/PLATFORM-AND-TENANTS.md) ·
-[Agent rules](AGENTS.md)
+```bash
+cd DPF
+./dpf-install.sh --sanity --prereq          # check the cluster
+./dpf-install.sh --sanity --hardware        # check the nodes
+./dpf-install.sh --install-prereq --dry-run # preview
+./dpf-install.sh --install-prereq           # cert-manager, Kamaji, Argo CD, ...
+./dpf-install.sh --install-dpf              # the DPF operator
+./dpf-install.sh --verify                   # every row: Installed, Ready, Match
+```
+
+Details and a recorded run: [installer guide](DPF/user-documentation/dpf-install-script-run.md).
+
+## Part 2: from scratch, after DPF is installed: the DPU lab
+
+Follow **[DPF/dpu-lab/README.md](DPF/dpu-lab/README.md)** step by step. Every
+line marked `# please change here` in the YAML files is a value you set for
+your site, and the comments next to it say where to find the value. List them
+all with:
+
+```bash
+cd DPF
+grep -rn 'please change here' dpu-lab/
+```
+
+HBN and hardware settings live in the numbered folders. Passwords and real
+addresses stay outside Git: save the BMC password with `DPF/credentials.sh`
+and keep your edited copies in `DPF/dpu-lab/site/`, which Git ignores.
+
+## Other ways and references
+
+- **Argo CD flow** (settings in `DPF/config.yaml`, applied as Argo
+  Applications): [DPF/README.md](DPF/README.md). Use it **or** the installer
+  above on a cluster, not both. Each resource has one owner.
+- [Demo commands](DPF/DEMO.txt) · [Passwords](DPF/PASSWORDS.md) ·
+  [DHCP](DPF/DHCP.md) · [Separate YAML stages](DPF/STAGED-INSTALL.md) ·
+  [Platform/tenant-only config](DPF/PLATFORM-AND-TENANTS.md) ·
+  [Agent rules](AGENTS.md)
+- Standalone DPF does not require NICo.
