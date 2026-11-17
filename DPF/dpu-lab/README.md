@@ -5,21 +5,20 @@ OS and has joined the DPU cluster". Follow the steps in order. Do not skip a
 check: each step says what you must see before you continue.
 
 - **The addresses, serial numbers and host names in this folder are examples.**
-  They stand in for the values of the lab where this guide was run. Put your
-  own values into `tenant-europe.conf` and `tenant-asia.conf`, then let
-  `new-tenant.sh` write them into the YAML files. `get-values.sh` reads most of
-  them for you from the cluster, the DPU BMC and the switch.
-- To keep real addresses out of Git, copy the two `.conf` files to
-  `dpu-lab/site/` and work on the copies. Git ignores that folder, and the YAML
-  is then written there. See [Your values](#your-values).
+  They stand in for the values of the lab where this guide was run. Every line
+  marked `# please change here` in the YAML needs your value. This command
+  lists them all: `grep -rn 'please change here' dpu-lab/`. See
+  [Your values](#your-values).
+- To keep real addresses out of Git, copy the numbered folders to
+  `dpu-lab/site/` (Git ignores that folder) and apply from the copies.
 - Example DPU of the first tenant: serial `MT0000000001`, BMC `192.0.2.246`.
 - Every file is explained in [FILES.md](FILES.md). Where each value comes from
   is in [CHECKS.md](CHECKS.md).
 - This folder is the single source for the lab: 15 YAML files in four
-  numbered folders, two values files, five helper scripts, and this guide. To add a second DPU,
-  see [Add one more tenant](#add-one-more-tenant) at the end.
+  numbered folders, and this guide. To add a second DPU, see
+  [Add one more tenant](#add-one-more-tenant) at the end.
 - Guided walkthrough in a browser:
-  [dpf-only-workbench.html](../user-documentation/dpf-only-workbench.html).
+  [dpf-only-workbench-new.html](../user-documentation/dpf-only-workbench-new.html).
 - All ten steps were run in a lab on 2026-11-14 and 2026-11-15, and the
   output shown is real, with the addresses and serial numbers replaced by the
   examples. The DPU reached `Ready`, both BGP sessions from HBN to
@@ -48,46 +47,29 @@ check: each step says what you must see before you continue.
 
 ## Your values
 
-Each tenant has one small values file. The files in Git hold example values;
-every line marked `# please change here` needs your value.
+The files in Git hold example values. Edit every line marked
+`# please change here`. A comment that says "same value as ..." marks a value
+that appears in more than one file: change every copy to the same value.
 
-1. Read the values from your systems. The helper only reads and prints no
-   password. `--bmc` and `--switch` are optional; ssh asks for the switch
-   password:
+| Value | Where to find it | File |
+| --- | --- | --- |
+| Management cluster API address and port | `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'`. If it shows a node name, get the address with `kubectl get node <name> -o wide`. | `1-dpf-settings/operatorconfig.yaml` |
+| DPU serial number and part number | `curl -sk --user root https://<DPU BMC>/redfish/v1/Systems/Bluefield \| grep -oE '"(SerialNumber\|PartNumber)": *"[^"]*"'` (asks for the BMC password) | `4-dpu-install/dpudevice.yaml` |
+| VRF name and L3 VNI | On the switch: `nv config show \| grep -B4 "'[0-9][0-9][0-9][0-9]*': {}"`. Each VRF name, and 4 lines below it its VNI. | `3-hbn-network/hbn-config.yaml` |
+| BGP AS number | On the switch: `nv config show \| grep -n -B12 remote-as`. The `remote-as` of the peer group of your DPU ports. | `3-hbn-network/hbn-config.yaml` |
+| VIP, VRRP id, VIP interface, host block, loopback | You choose them with the network team. | `2-dpu-cluster/dpucluster.yaml`, `3-hbn-network/ipam-*.yaml` |
 
-   ```bash
-   bash dpu-lab/get-values.sh --bmc 192.0.2.246 --switch cumulus@192.0.2.254
-   ```
-
-   | Part of the output | Gives you |
-   | --- | --- |
-   | 1. Management cluster | `API_IP`, `API_PORT` |
-   | 2. DPU card (read from the DPU BMC) | `SERIAL`, `OPN` |
-   | 4. Switch | the ports of your DPU, `VRF`, `L3VNI`, `ASN`, and the loopbacks the switch accepts |
-
-   `VIP`, `VRID`, `HOST_NET` and `LOOPBACK` are values you choose with the
-   network team. Part 2 needs the BMC password Secret of step 2; until it
-   exists, the helper prints a `curl` command instead.
-
-2. Put the values into the values file and write them into the YAML:
-
-   ```bash
-   bash dpu-lab/new-tenant.sh dpu-lab/tenant-europe.conf --force
-   ```
-
-To keep your real values out of Git, use copies in the ignored folder
-`dpu-lab/site/` instead. The YAML is then written next to the copies, and you
-apply from there (`dpu-lab/site/1-dpf-settings/` and so on):
+To keep your real values out of Git, work on copies in the ignored folder
+`dpu-lab/site/` and apply from there (`dpu-lab/site/1-dpf-settings/` and so on).
+`-n` makes `cp` skip files that already exist, so it never overwrites your copies:
 
 ```bash
 mkdir -p dpu-lab/site
-cp dpu-lab/tenant-europe.conf dpu-lab/tenant-asia.conf dpu-lab/site/
-bash dpu-lab/new-tenant.sh dpu-lab/site/tenant-europe.conf
+cp -rn dpu-lab/0-bmc-secret dpu-lab/[1-4]-* dpu-lab/site/
 ```
 
 The lab that produced this guide works that way: its real addresses and serial
-numbers exist only in `dpu-lab/site/`, and the files rendered from them are
-identical to what runs in the cluster.
+numbers exist only in `dpu-lab/site/`.
 
 ## Step 1: check that DPF is installed
 
@@ -165,11 +147,11 @@ the quotes. Then apply it and prove that the password works:
 
 ```bash
 kubectl apply -f dpu-lab/0-bmc-secret/
-bash dpu-lab/get-values.sh --bmc 192.0.2.246
+curl -sk --user root https://192.0.2.246/redfish/v1/Systems/Bluefield | grep -oE '"(SerialNumber|PartNumber)": *"[^"]*"'
 ```
 
-The helper must print the serial number of the DPU. If it prints
-`HTTPError 401`, the password in the file is wrong: fix it before you go on,
+curl asks for the BMC password: type the one you saved. It must print the serial
+number and the part number. If it reports `401`, the password in the file is wrong: fix it before you go on,
 because repeated wrong logins can lock the BMC account. The YAML passed a
 server dry-run in this lab; the real apply was not run, because the Secret
 already exists here.
@@ -373,20 +355,22 @@ dpu-cluster-lab-doca-hbn-4zq9v-ds-zwkr7   2/2     Running   0          4m59s
 The port comes from `kubectl -n dpu-cluster-lab get svc dpu-cluster-lab`.
 
 `Ready` is a control-plane result. It does not prove that traffic flows
-through HBN. Check BGP with the helper (part 3 of its output):
+through HBN. Check BGP inside the HBN pod, with the same `$DPUK` as above:
 
 ```bash
-bash dpu-lab/get-values.sh
+HBN=$($DPUK -n dpf-operator-system get pods -l app.kubernetes.io/name=hbn -o name | head -1)
+$DPUK -n dpf-operator-system exec $HBN -c doca-hbn -- vtysh -c 'show bgp ipv4 unicast summary'
 ```
 
 ```text
-  HBN pod dpu-cluster-lab-doca-hbn-4zq9v-ds-zwkr7:
-    local AS number 65101  (bgp_autonomous_system in 3-hbn-network/hbn-config.yaml)
-    Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-    cumulus(p0_if)  4      65001       891       620        0    0    0 00:04:16            2        3 N/A
-    cumulus(p1_if)  4      65001       842       578        0    0    0 00:03:21            2        3 N/A
-    RESULT: OK, 2 of 2 BGP sessions to the switch are up.
+Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
+cumulus(p0_if)  4      65001       891       620        0    0    0 00:04:16            2        3 N/A
+cumulus(p1_if)  4      65001       842       578        0    0    0 00:03:21            2        3 N/A
 ```
+
+The header line says `local AS number 65101`: it must equal
+`bgp_autonomous_system` in `3-hbn-network/hbn-config.yaml`. Both neighbors must
+be up.
 
 A working session shows a time under `Up/Down` and a number under
 `State/PfxRcd`. `Idle` and `never` mean the session is down.
@@ -426,16 +410,11 @@ switch is configured today".
 DPF does not configure the server. The server takes the first address of the
 host block (`10.60.126.1`), and HBN on the DPU is its gateway (`10.60.126.2`).
 
-1. Open a shell on the server. If the server has a management address, use
-   plain `ssh`. In this lab it has none, so the login goes through the HBN pod
-   on the DPU. `SERVER_KEY` is the ssh key of the server's `ubuntu` user:
-
-   ```bash
-   SERVER_KEY=/path/to/server-key bash dpu-lab/server-login.sh lab
-   ```
-
-   The word after the script is the tenant name: `lab` for the Europe server,
-   `asia` for the Asia server.
+1. Open a shell on the server. If it has a management address, use plain
+   `ssh`. If it has none, as in this lab, use the iDRAC virtual console. A
+   helper that logged in through the HBN pod was used here; it is no longer in
+   this folder. Get it from Git history with
+   `git show 7e30924:DPF/dpu-lab/server-login.sh`.
 
 2. On the server, set the address and the gateway on the port that connects to
    the DPU (`enp23s0f0np0` here), then ping the gateway:
@@ -446,53 +425,57 @@ host block (`10.60.126.1`), and HBN on the DPU is its gateway (`10.60.126.2`).
    ping -c 3 10.60.126.2
    ```
 
-3. Back on the admin host, check from the other side:
+3. Back on the admin host, check from the other side. HBN pings the server
+   inside the tenant VRF (use the VRF name of your tenant):
 
    ```bash
-   bash dpu-lab/get-values.sh
+   $DPUK -n dpf-operator-system exec $HBN -c doca-hbn -- ip vrf exec EUROPE ping -c 2 -W 2 10.60.126.1
    ```
 
-   ```text
-       RESULT: OK, 2 of 2 BGP sessions to the switch are up.
-       SERVER: OK, the server address 10.60.126.1 answers from HBN (gateway 10.60.126.2, VRF EUROPE).
-   ```
+   It must show `0% packet loss`. Run the BGP summary of step 9 again: both
+   neighbors must still be up.
 
 A ping from the switch, inside VRF `EUROPE`, to the server `10.60.126.1` also
 answered (3 of 3). That path crosses the VXLAN tunnel between switch and DPU.
 
 The two `ip` commands are lost when the server reboots, and they set no DNS
-servers. So make the address permanent:
+servers. To make the address permanent, write a netplan file on the server,
+for example `/etc/netplan/60-dpu-port.yaml`, with `chmod 600`:
 
-- Copy `server-address.sh` to the server and run it there. It writes one
-  netplan file, with the DNS servers, and undoes itself after 3 minutes if the
-  gateway does not answer:
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp23s0f0np0:  # please change here: the server port that connects to the DPU
+      dhcp4: false
+      dhcp6: false
+      addresses: [10.60.126.1/29]  # please change here: first address of the host block
+      routes:
+        - to: default
+          via: 10.60.126.2  # please change here: HBN gateway, second address of the host block
+      nameservers:
+        addresses: [203.0.113.53, 203.0.113.54]  # please change here: DNS servers reachable from the tenant network
+```
 
-  ```bash
-  SERVER_KEY=/path/to/server-key bash dpu-lab/server-login.sh lab 'cat > server-address.sh' < dpu-lab/server-address.sh
-  SERVER_KEY=/path/to/server-key bash dpu-lab/server-login.sh lab
-  ```
+Check it, then apply it. `netplan try` undoes the change by itself if you lose
+the connection:
 
-  ```bash
-  sudo bash server-address.sh enp23s0f0np0 10.60.126.1/29 10.60.126.2 203.0.113.53,203.0.113.54 --check
-  sudo bash server-address.sh enp23s0f0np0 10.60.126.1/29 10.60.126.2 203.0.113.53,203.0.113.54
-  ```
+```bash
+sudo netplan generate
+sudo netplan try
+```
 
-  The first command only validates. This was run on both lab servers on
-  2026-11-15:
-
-  ```text
-  Note: an existing netplan file calls this port "dpu-host-pf"; using that name.
-  OK: enp23s0f0np0 has 10.60.126.1/29, the gateway 10.60.126.2 answers, and the setting is permanent (/etc/netplan/60-dpu-port.yaml).
-  ```
-
-  Afterwards, from each server: the gateway answered 3 of 3, `8.8.8.8` answered
-  3 of 3, `cisco.com` resolved, and `https://www.cisco.com` returned HTTP 200.
-  A ping from the Europe server to the Asia server got no answer, as expected:
-  the tenants are separate. A reboot of a server was not tried.
-- Why a script and not a hand-written netplan file: these servers have a
-  cloud-init netplan file that claims the same port by its MAC address and
-  asks for DHCP. A second file that names the port differently is ignored. The
-  script finds the existing name and merges with it.
+- **Cloud-init conflict.** These lab servers have a cloud-init netplan file that
+  claims the same port by its MAC address and asks for DHCP. A second file that
+  names the port differently is ignored. Use the same name as that file
+  (`dpu-host-pf` here), or edit that file.
+- A helper script did this on both lab servers on 2026-11-15 (Git history:
+  `git show 7e30924:DPF/dpu-lab/server-address.sh`). Afterwards, from each
+  server: the gateway answered 3 of 3, `8.8.8.8` answered 3 of 3, `cisco.com`
+  resolved, and `https://www.cisco.com` returned HTTP 200. A ping from the
+  Europe server to the Asia server got no answer, as expected: the tenants are
+  separate. A reboot of a server was not tried. The netplan file above was not
+  run on its own in this lab.
 - DNS servers: `203.0.113.53` and `203.0.113.54` answer from the tenant network.
   `203.0.113.55` and the public DNS `8.8.8.8` do not answer DNS questions there.
 
@@ -503,29 +486,9 @@ folders above are the first tenant (Europe in this lab). A second tenant gets
 its own copy of the files in folders 2, 3 and 4, with its own names and values.
 Folder 1 and the OS image (`bfb.yaml`) are shared.
 
-Each tenant has one small values file, and one script turns it into YAML:
-
-| Values file | Tenant | Its YAML files |
-| --- | --- | --- |
-| `dpu-lab/tenant-europe.conf` | first tenant, objects named `lab` | the numbered folders 2, 3 and 4 |
-| `dpu-lab/tenant-asia.conf` | second tenant, objects named `asia` | `dpu-lab/tenant-asia/`, generated |
-
-For the first tenant the script compares the values file with the numbered
-folders. It writes into them only with `--force`:
-
-```bash
-bash dpu-lab/new-tenant.sh dpu-lab/tenant-europe.conf
-```
-
-```text
-Tenant lab is the first tenant: its files are the numbered folders.
-OK: all 10 values in tenant-europe.conf match those files. Nothing to do.
-```
-
-So a new site needs only these edits: the two values files, and the lines
-marked `# please change here` in `1-dpf-settings/operatorconfig.yaml`,
-`2-dpu-cluster/dpucluster.yaml` (the interface) and
-`4-dpu-install/dpuflavor.yaml` (the DNS servers).
+A second tenant needs its own copy of folders 2, 3 and 4 with its own names and
+values. Nothing else changes in the first tenant's files. The values that must
+differ from the first tenant are in the table below.
 
 | | First tenant (Europe) | Second tenant (Asia) |
 | --- | --- | --- |
@@ -539,31 +502,43 @@ marked `# please change here` in `1-dpf-settings/operatorconfig.yaml`,
 1. Read the serial number and part number of the new DPU from its BMC:
 
    ```bash
-   bash dpu-lab/get-values.sh --bmc 192.0.2.249
+   curl -sk --user root https://192.0.2.249/redfish/v1/Systems/Bluefield | grep -oE '"(SerialNumber|PartNumber)": *"[^"]*"'
    ```
 
    ```text
-     DPU BMC address        192.0.2.249                      -> bmcIp and label dpudevice-bmc-ip
-     serial number          MT0000000002                       -> serialNumber and label dpudevice-psid
-     part number (OPN)      900-9D3B4-00CV-EA0                 -> opn and label dpudevice-opn
+   "SerialNumber": "MT0000000002"
+   "PartNumber": "900-9D3B4-00CV-EA0"
    ```
 
-2. Put the values of the tenant in a values file. `dpu-lab/tenant-asia.conf`
-   holds the Asia values of this lab. For another tenant, copy it and edit the
-   lines marked `# please change here`.
-
-3. Create the files. The script only writes files; it does not touch the
-   cluster. It stops if a value is already used by the first tenant.
+2. Copy the three folders. The copy is ignored by Git (`.gitignore` covers
+   `dpu-lab/tenant-*/`):
 
    ```bash
-   bash dpu-lab/new-tenant.sh dpu-lab/tenant-asia.conf
+   mkdir -p dpu-lab/tenant-asia
+   cp -r dpu-lab/2-dpu-cluster dpu-lab/3-hbn-network dpu-lab/4-dpu-install dpu-lab/tenant-asia/
+   rm dpu-lab/tenant-asia/4-dpu-install/bfb.yaml
    ```
 
-   ```text
-   Wrote 13 files to .../dpu-lab/tenant-asia/ (2-dpu-cluster, 3-hbn-network, 4-dpu-install)
+   The `rm` is important: the OS image (`bfb.yaml`) is shared by all tenants.
+   If the copy kept it, deleting this tenant later would delete the image of
+   the first tenant too.
 
-   Tenant asia: DPU cluster dpu-cluster-asia at 192.0.2.203, VRF ASIA, VNI 100002, AS 65201, DPU MT0000000002.
+3. Rename the objects from `lab` to `asia`, then edit the lines marked
+   `# please change here` with the values of the table above. The `sed` only
+   changes names; it does not touch the cluster:
+
+   ```bash
+   sed -i \
+     -e 's/dpu-cluster-lab/dpu-cluster-asia/g' -e 's/dpu-node-lab/dpu-node-asia/g' \
+     -e 's/doca-hbn-lab/doca-hbn-asia/g' -e 's/hbn-lab/hbn-asia/g' \
+     -e 's/lab-dpu1/asia-dpu1/g' -e 's/lab-\(p0\|p1\|pf0hpf\|host\|loopback\)/asia-\1/g' \
+     -e 's/tenant: lab/tenant: asia/g' -e 's/nameSuffix: lab/nameSuffix: asia/g' \
+     $(find dpu-lab/tenant-asia -name '*.yaml')
+   grep -rnw lab dpu-lab/tenant-asia
    ```
+
+   The `grep` must print only comments and the `60-lab-dns` file name in
+   `dpuflavor.yaml`. Any other line still holds the name of the first tenant.
 
 4. Check the switch for this tenant (workbench page, part 5). In this lab the
    ports `swp21` and `swp22` already expect AS `65201`, and the switch permits
@@ -592,7 +567,7 @@ All five steps were run on 2026-11-15. The times, in UTC:
 | 10:55 | DPU answered again; reboot mark removed |
 | 11:10 | DPU `Ready`: 68 minutes after the apply |
 | 11:12 | HBN pod running; BGP to the switch up, 2 of 2, because the switch was prepared first |
-| 11:45 | Server address set with `server-address.sh` (`10.60.127.1/29`, gateway `10.60.127.2`); internet works |
+| 11:45 | Server address set (`10.60.127.1/29`, gateway `10.60.127.2`); internet works |
 
 Nothing is open for Asia.
 
@@ -679,10 +654,10 @@ waits for, for example with
 | `192.0.2.200` does not answer from the admin host (`no route to host`) | The admin host cannot reach the management nodes on that network; the DPU can | Not a fault. Use the management-node address as in step 9 |
 | `node dpu-node-lab-lab-dpu1 not found` in the controller log during `DPU Cluster Config` | The DPU is still starting and has not joined | Wait; it took about 10 minutes here. Much longer means the DPU cannot reach `192.0.2.200`, or its DNS or clock is wrong |
 | iDRAC login fails with HTTP 401 | You used an old password file | Stop after one or two tries so the account does not lock. Use the login named in step 8 |
-| `hbn-lab` and `hbn-asia` show `Pending` instead of `Success` once a second tenant exists | A status display of DPF v26.4.0 with more than one DPU cluster; it was the same on 2026-10-16 | Not a fault. Judge by `bash dpu-lab/get-values.sh`: BGP up and the server answers |
+| `hbn-lab` and `hbn-asia` show `Pending` instead of `Success` once a second tenant exists | A status display of DPF v26.4.0 with more than one DPU cluster; it was the same on 2026-10-16 | Not a fault. Judge by the BGP summary (step 9) and the ping to the server (step 10) |
 | BGP neighbors stay `Idle` with `Up/Down` `never` | The switch refuses the session: `bgp_autonomous_system` in `3-hbn-network/hbn-config.yaml` differs from `remote-as` on the switch | On the switch, run `nv config show \| grep -n -B12 remote-as` and make both sides equal. Seen and fixed here on the switch side (step 9) |
 | BGP is up but the switch has no route to the DPU loopback | The inbound prefix list on the switch does not permit the loopback | On the switch, add a permit rule for the loopback in `3-hbn-network/ipam-loopback.yaml` |
-| The server port stays without an address after `netplan apply` | Another netplan file (cloud-init) claims the port by MAC address and asks for DHCP | Use `server-address.sh` (step 10): it merges with that entry |
+| The server port stays without an address after `netplan apply` | Another netplan file (cloud-init) claims the port by MAC address and asks for DHCP | Use the same port name as that file in your netplan file (step 10) |
 | `ping 10.60.126.2` from the server fails | The server port has no address, or it is the wrong port | On the server, `ip -br addr` must show `10.60.126.1/29` on `enp23s0f0np0` (step 10) |
 | Warning `Nameserver limits were exceeded` on DPU pods | The DPU has more than three DNS servers in total | Seen here; the pods still run |
 

@@ -37,12 +37,12 @@ real ones are kept locally in `dpu-lab/site/`, which Git ignores.
 
 ## Asia tenant, 2026-11-15
 
-- Created with `new-tenant.sh` from `tenant-asia.conf`; the 13 files passed a server dry-run and were applied.
+- Created with the helper `new-tenant.sh` (since removed; Git history `7e30924`) from `tenant-asia.conf`; the 13 files passed a server dry-run and were applied.
 - DPU `MT0000000002` reached `Ready` 68 minutes after the apply (10:00 to 11:10 UTC); the OS install took about
   50 minutes, Europe took 32. The node `dpu-node-asia-asia-dpu1` joined `dpu-cluster-asia` (v1.34.8).
 - HBN: local AS `65201`, router id `10.60.124.35`; IPv4 and EVPN sessions to the switch up on both ports. Ping from
   the switch (VRF `ASIA`) to the HBN gateway `10.60.127.2` answered 3 of 3.
-- The server of this DPU (`SRV0002`, Ubuntu `server-asia`) got `10.60.127.1/29` with `server-address.sh` and
+- The server of this DPU (`SRV0002`, Ubuntu `server-asia`) got `10.60.127.1/29` with the helper `server-address.sh` (since removed) and
   reaches the internet through the DPU (see the server section).
 - Since the second DPU cluster exists, the DPUDeployments `hbn-lab` and `hbn-asia` show `Pending` (condition
   `DPUServicesReady`; the HBN service reports `ApplicationsReady=False`), although both HBN applications are
@@ -56,9 +56,9 @@ real ones are kept locally in `dpu-lab/site/`, which Git ignores.
   The lab owner set `10.60.126.1/29` and a default route through `10.60.126.2` by hand.
 - Result: ping from HBN (VRF `EUROPE`) to `10.60.126.1` 3 of 3; ping from the switch (VRF `EUROPE`) to
   `10.60.126.1` 3 of 3, across the VXLAN tunnel; the lab owner reported the ping from the server as working.
-- Login path: SSH through the HBN pod over the IPv6 link-local address of the server port (`server-login.sh <lab|asia>`
+- Login path: SSH through the HBN pod over the IPv6 link-local address of the server port (helper `server-login.sh <lab|asia>`, since removed
   with the ssh key of the server's `ubuntu` user).
-- `server-address.sh` was run on both servers (serials `SRV0001` and `SRV0002` confirmed first). The first run on
+- The helper `server-address.sh` was run on both servers (serials `SRV0001` and `SRV0002` confirmed first). The first run on
   the Asia server failed and undid itself: the cloud-init netplan file claims the port by MAC address under the
   name `dpu-host-pf` with DHCP, so a second entry under the port name was ignored. The script now reuses the
   existing name. Second run on Asia and the run on Europe: `OK`.

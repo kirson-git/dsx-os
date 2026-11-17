@@ -49,24 +49,20 @@ The switch must carry the same VRF, VNI and AS number.
 
 ## Values files and helpers
 
-The values in this folder are **examples**. Each tenant (one DPU cluster, one
-HBN network, one DPU) has one values file; every line marked
-`# please change here` needs your value.
+The values in this folder are **examples**. Every line marked
+`# please change here` needs your value. A comment that says "same value as ..."
+marks a value that appears in more than one file; all copies must match.
+`grep -rn 'please change here' dpu-lab/` lists every one of them.
 
-| File | What it does |
-| --- | --- |
-| `tenant-europe.conf` | Values of the first tenant. Its YAML files are the numbered folders, and its objects carry the name `lab`. |
-| `tenant-asia.conf` | Values of a second tenant. Copy it for every further tenant. |
-| `new-tenant.sh` | Turns a values file into YAML. First tenant: compares with the numbered folders, and writes into them with `--force`. Other tenants: writes a generated folder `tenant-<name>/`. It refuses a value that another tenant already uses. It only writes files. |
-| `get-values.sh` | Reads values from the live systems and prints where each one goes: the management API, the serial number and part number of each DPU (from its BMC), the BGP state of HBN and whether the server answers, per tenant. With `--switch user@address` it also reads the switch: the ports of each DPU and the lines your VRF, VNI, AS number and loopback must match. It only reads and prints no password. |
-| `server-login.sh` | Opens a shell on the server that holds a DPU when that server has no management address. It goes through the HBN pod on the DPU. |
-| `server-address.sh` | Runs on that server, not on the admin host. It gives the server port that connects to the DPU a permanent address, gateway and DNS servers by writing `/etc/netplan/60-dpu-port.yaml`. With `--check` it only validates. If the gateway does not answer after the change, it undoes the change after 3 minutes. |
+`site/` is where your real values belong. Git ignores it. Copy the numbered
+folders there with `cp -rn`, edit the copies, and apply from there. A copy of
+folders 2 to 4 for a second tenant goes to `tenant-<name>/`, which Git ignores
+too (see "Add one more tenant" in the [README](README.md)).
 
-`site/` is where your real values belong. Git ignores it. Copy the two `.conf`
-files there, edit the copies, and run `new-tenant.sh` on them: the YAML is then
-written into `site/` as well, and you apply from there. Generated tenant
-folders (`tenant-<name>/`) are ignored by Git too: change the values file and
-run the script again; do not edit them by hand.
+The helper scripts of the first lab run (`get-values.sh`, `new-tenant.sh`,
+`server-login.sh`, `server-address.sh`) and the two `tenant-*.conf` files were
+removed from this folder. They are in Git history up to commit `7e30924`, for
+example `git show 7e30924:DPF/dpu-lab/get-values.sh`.
 
 ## Not YAML, but required
 
