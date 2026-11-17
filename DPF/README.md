@@ -13,6 +13,17 @@ Admin host --kubectl--> Management Kubernetes
 Server --- DPU (HBN: BGP/EVPN) ---BGP--- Switch
 ```
 
+## Get the files, and update later
+
+```bash
+git clone --branch stable https://github.com/kirson-git/dsx-os.git
+cd dsx-os/DPF
+```
+
+To update later, run `git pull`. The `stable` branch only moves when a tested
+version is released. Keep your edited YAML in `dpu-lab/site/` (Git ignores it),
+so a pull never conflicts with your changes.
+
 ## Learn first
 
 Open the interactive workbench: [docs/dpf-only-workbench-new.html](docs/dpf-only-workbench-new.html).

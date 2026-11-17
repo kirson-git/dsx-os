@@ -5,6 +5,17 @@
 | [DPF](DPF/README.md) | Standalone DPF: installer, DPU lab, HBN network |
 | [NICo](NICo/README.md) | NICo Core 2.2.2 + DPF; staged GitOps lab-validation profile |
 
+## Get the files, and update later
+
+```bash
+git clone --branch stable https://github.com/kirson-git/dsx-os.git
+cd dsx-os
+```
+
+To update later, run `git pull`. The `stable` branch only moves when a tested
+version is released. Keep your edited YAML in `dpu-lab/site/` (Git ignores it),
+so a pull never conflicts with your changes.
+
 ## Learn it first: the interactive workbench
 
 One HTML page explains DPU basics, the YAML files and the install steps, with
